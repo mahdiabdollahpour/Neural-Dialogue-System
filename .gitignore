@@ -107,3 +107,5 @@ venv.bak/
 *.png
 test*.
 board/
+glove.6B/
+saved/
