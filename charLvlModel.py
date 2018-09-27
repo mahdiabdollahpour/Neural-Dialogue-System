@@ -14,7 +14,8 @@ batch_size = 64  # 128
 time_steps = 100  # 50
 NUM_TRAIN_BATCHES = 20000
 
-def restore_if_possible(sess, saver, check_point="saved/model.ckpt"):
+
+def restore_if_possible(sess, saver, check_point):
     ckpt = tf.train.get_checkpoint_state(os.path.dirname(check_point))
     if ckpt and ckpt.model_checkpoint_path:
         saver.restore(sess, ckpt.model_checkpoint_path)
@@ -134,7 +135,7 @@ class LSTM_NN:
         return cost
 
 
-def load_model(check_point="saved/model.ckpt"):
+def load_model(check_point):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.InteractiveSession(config=config)
@@ -153,7 +154,7 @@ def load_model(check_point="saved/model.ckpt"):
     return net
 
 
-def train(check_point="saved/model.ckpt", continue_training=False):
+def train(check_point, save=True, continue_training=False):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.InteractiveSession(config=config)
@@ -168,8 +169,22 @@ def train(check_point="saved/model.ckpt", continue_training=False):
     )
     sess.run(tf.global_variables_initializer())
     saver = tf.train.Saver(tf.global_variables())
+    ## saving the config to a file to know the config when loading
+    ## you should fill in the config in code by your self and the text file
+    ## is only for you to read
+    if save and (not continue_training):
+        addr = os.path.abspath(os.path.join(check_point, os.pardir))
+        os.makedirs(addr)
+        addr += '\config.txt'
+        with open(addr, 'w') as f:
+            print('writing config to ', addr)
+            f.write('in_size : ' + str(in_size) + '\n')
+            f.write('out_size : ' + str(out_size) + '\n')
+            f.write('hidden_size : ' + str(lstm_size) + '\n')
+            f.write('layer num : ' + str(num_layers) + '\n')
+
     if continue_training:
-        restore_if_possible(sess, saver,check_point)
+        restore_if_possible(sess, saver, check_point)
     last_time = time.time()
     batch = np.zeros((batch_size, time_steps, in_size))
     batch_y = np.zeros((batch_size, time_steps, in_size))
@@ -195,7 +210,8 @@ def train(check_point="saved/model.ckpt", continue_training=False):
             print("batch: {}  loss: {}  speed: {} batches / s".format(
                 i, cst, 100 / diff
             ))
-            saver.save(sess, check_point)
+            if save:
+                saver.save(sess, check_point)
 
 
 def predict(prefix, model, generate_len=500):
@@ -210,9 +226,10 @@ def predict(prefix, model, generate_len=500):
         gen_str += vocab[element]
         out = model.run_step(convert_to_one_hot(vocab[element], vocab), False)
 
-    print(gen_str)
+        print(gen_str)
 
 
 # model = load_model("saved/model.ckpt")
 # predict("I am", model=model)
-train(continue_training=True)
+# train(continue_training=True)
+train('test/model.ckpt', True, False)
