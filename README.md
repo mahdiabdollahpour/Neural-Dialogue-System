@@ -1,9 +1,10 @@
 "# RNN-Language-Model" 
 
- Two main aproaches
+ Two main approaches
 
-1- charachter level 
+1- character level 
 
 2- word level
 
-using  LSTM layers to model recurent nueral network
+using  LSTM layers to model recurrent neural network to predict next word or char
+given the previous ones
