@@ -1,25 +1,6 @@
-import os
 import random
 import time
-import numpy as np
-import tensorflow as tf
-from utils import *
-
-
-# input_file = 'data.txt'
-# data, vocab = load_data(input_file)
-# in_size = out_size = len(vocab)
-# lstm_size = 256  # 128
-# num_layers = 2
-# batch_size = 64  # 128
-# time_steps = 100  # 50
-# NUM_TRAIN_BATCHES = 20000
-
-
-# def restore_if_possible(sess, saver, check_point):
-#     ckpt = tf.train.get_checkpoint_state(os.path.dirname(check_point))
-#     if ckpt and ckpt.model_checkpoint_path:
-#         saver.restore(sess, ckpt.model_checkpoint_path)
+from char_level.utils import *
 
 
 class LSTM_NN:
@@ -39,7 +20,7 @@ class LSTM_NN:
         if create:
             if not os.path.exists(addr):
                 os.makedirs(addr)
-            else :
+            else:
                 raise Exception('a model with same name exits on this directory')
             ## writing config to file
             addr += '\config.txt'
@@ -49,7 +30,6 @@ class LSTM_NN:
                 f.write(str(self.out_size) + '\n')
                 f.write(str(self.hidden_size) + '\n')
                 f.write(str(self.num_layers) + '\n')
-
 
         ## Defining the computational graph
 
@@ -155,12 +135,11 @@ class LSTM_NN:
         return cost
 
 
-
 def load_model(check_point_dir):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     sess = tf.InteractiveSession(config=config)
-    with open(check_point_dir + '\config.txt', mode='r') as f:
+    with open( check_point_dir + '/config.txt', mode='r') as f:
         lines = f.readlines()
         print(lines)
         in_size = int(lines[0])
@@ -169,7 +148,7 @@ def load_model(check_point_dir):
         num_layers = int(lines[3])
 
     net = LSTM_NN(
-        check_point_dir = check_point_dir,
+        check_point_dir=check_point_dir,
         in_size=in_size,
         hidden_size=lstm_size,
         num_layers=num_layers,
@@ -240,14 +219,13 @@ def predict(prefix, model, vocab, generate_len):
     print(gen_str)
 
 
+# config = tf.ConfigProto()
+# config.gpu_options.allow_growth = True
+# sess = tf.InteractiveSession(config=config)
 
+data, vocab = load_data("data.txt")
+# model = LSTM_NN(len(vocab), 256, 2, len(vocab), sess, 'test_model', True)
+# train(model, data)
+model = load_model('char_level/saved')
 
-
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-sess = tf.InteractiveSession(config=config)
-
-data, vocab = load_data('data.txt')
-model = LSTM_NN(len(vocab),256,2,len(vocab),sess,'test_model',True)
-train(model, data)
 predict('I am ', model, vocab, 500)
