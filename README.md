@@ -14,3 +14,8 @@ given the previous ones
 #### TO DO
 
 Using state_is_tuple in char level
+
+printing number of trainable parameter
+
+running word level with new changes
+

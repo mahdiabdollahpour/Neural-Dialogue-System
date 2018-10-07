@@ -11,7 +11,7 @@ from tensorflow.contrib import rnn
 import random
 import time
 import numpy as np
-from WLVL.utils import *
+from word_level.utils import *
 
 
 def check_restore_parameters(sess, saver, path):
@@ -31,7 +31,7 @@ display_step = 200
 timesteps = 10  # timesteps
 num_hiddens = [128, 128]  # hidden layer num of features
 num_fc_hiddens = []
-data_string, vocab = load_data("../data.txt")
+data_string, vocab = load_data("../datasets/data.txt")
 data = data_by_ID_and_truncated(data_string, vocab, timesteps)
 print("vocab len :", len(vocab))
 
@@ -83,8 +83,8 @@ train_op = optimizer.minimize(loss_op)
 # correct_pred = tf.equal(tf.argmax(prediction, 1), tf.argmax(Y, 1))
 # accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-
-iter_num = 20
+print('number of trainable variables : ',get_trainable_variables_num())
+iter_num = 200
 with tf.Session() as sess:
     # Initialize the variables (i.e. assign their default value)
     sess.run(tf.global_variables_initializer())
@@ -93,24 +93,24 @@ with tf.Session() as sess:
 
     # check_restore_parameters(sess, saver, saved_file)
     last_time = time.time()
-    batch_x = np.zeros((batch_size, timesteps))
-    batch_y = np.zeros((batch_size, timesteps, vocab_size))
     possible_batch_ids = range(len(data) - timesteps - 1)
     for cnt in range(iter_num):
         iter_loss = 0
         number_of_batches = int(len(data) / batch_size)
+        # number_of_batches = 1
         for i in range(number_of_batches):
             # Sample time_steps consecutive samples from the dataset text file
+            batch_x = np.zeros((batch_size, timesteps))
+            batch_y = np.zeros((batch_size, timesteps, vocab_size))
             for kk in range(batch_size):
                 batch_x[kk, :] = data[i * batch_size + kk][:-1]
                 for zz in range(timesteps):
                     batch_y[kk, zz, :] = get_one_hot(data[i * batch_size + kk][zz + 1], vocab)
 
-            loss = sess.run([loss_op], feed_dict={X: batch_x, Y: batch_y})
-
-            iter_loss = iter_loss + loss[0]
+            _, loss = sess.run([train_op, loss_op], feed_dict={X: batch_x, Y: batch_y})
+            iter_loss += np.sum(loss)
             if i % display_step == 0:
-                print('Mini batch loss of batch ', i, ' is :', loss[0])
+                print('Mini batch loss of batch ', i, ' is :', np.sum(loss))
 
         new_time = time.time()
         diff = new_time - last_time
