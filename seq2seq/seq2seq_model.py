@@ -91,8 +91,11 @@ with tf.Session() as sess:
             feed_dict = {
                 encoder_inputs: enc_inp,
                 decoder_inputs: dec_inp,
-                decoder_outputs: dec_tgt
+                decoder_targets: dec_tgt
             }
+            # print(np.shape(enc_inp))
+            # print(np.shape(dec_inp))
+            # print(np.shape(dec_tgt))
 
             _, loss = sess.run([train_op, loss_op], feed_dict=feed_dict)
             iter_loss += np.sum(loss)
