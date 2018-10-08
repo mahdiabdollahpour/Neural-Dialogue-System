@@ -11,7 +11,7 @@ from tensorflow.contrib import rnn
 import random
 import time
 import numpy as np
-from word_level.utils import *
+from word_level_language_models.utils import *
 
 
 def check_restore_parameters(sess, saver, path):

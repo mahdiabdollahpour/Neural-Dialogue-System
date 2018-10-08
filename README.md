@@ -15,7 +15,11 @@ given the previous ones
 
 Using state_is_tuple in char level
 
-printing number of trainable parameter
+printing number of trainable parameter ==> done
 
 running word level with new changes
+
+using estimator
+
+converting string data to indexes takes long
 

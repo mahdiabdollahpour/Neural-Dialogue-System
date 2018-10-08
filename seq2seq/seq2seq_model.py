@@ -7,26 +7,16 @@ data1string, vocab1 = load_data('../datasets/train.en.txt', '../datasets/vocab.e
 data2string, vocab2 = load_data('../datasets/train.vi.txt', '../datasets/vocab.vi.txt')
 src_vocab_size = len(vocab1)
 tgt_vocab_size = len(vocab2)
-print(vocab1[:10])
-print(vocab2[:10])
+# print(vocab1[:10])
+# print(vocab2[:10])
 batch_size = 64
 source_sequence_length = 23
 decoder_lengths = 26
 
-data1 = data_by_ID_and_truncated(data1string[:1000], vocab1, source_sequence_length)
-data2 = data_by_ID_and_truncated(data2string[:1000], vocab2, decoder_lengths + 1, append_and_prepend=True)
+how_many_lines = 10000
+data1 = data_by_ID_and_truncated(data1string[:how_many_lines], vocab1, source_sequence_length)
+data2 = data_by_ID_and_truncated(data2string[:how_many_lines], vocab2, decoder_lengths + 1, append_and_prepend=True)
 
-# tf.reset_default_graph()
-sess = tf.InteractiveSession()
-
-# PAD = 0
-# EOS = 1
-#
-# vocab_size = 10
-# input_embedding_size = 20
-#
-# encoder_hidden_units = 20
-# decoder_hidden_units = encoder_hidden_units
 embedding_size = 100
 hidden_num = 128
 encoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='encoder_inputs')
@@ -71,12 +61,13 @@ stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
 loss_op = tf.reduce_mean(stepwise_cross_entropy)
 train_op = tf.train.AdamOptimizer().minimize(loss_op)
 
-sess.run(tf.global_variables_initializer())
-
 display_each = 100
+import global_utils
+
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-
+    num = global_utils.get_trainable_variables_num()
+    print('Number of trainable variables ', num)
     iter_num = 200
     number_of_batches = int(len(data1) / batch_size)
     print('There are ', number_of_batches, ' batches')
@@ -111,4 +102,4 @@ with tf.Session() as sess:
             iter_loss += np.sum(loss)
             if j % display_each == 0:
                 print('Mini batch loss is ', loss)
-        print('Average loss in iteration ', i, ' is ', iter_loss / batch_size)
+        print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
