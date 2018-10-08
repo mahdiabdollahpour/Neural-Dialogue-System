@@ -1,5 +1,65 @@
 import numpy as np
 
+unknown_token = '<unk>'
+empty_token = '<EMP>'
+start_token = '<s>'
+end_token = '</s>'
+import re
+
+
+def get_batch(seq2, vocab2):
+    tgt_inp = [vocab2.index(start_token)].append(seq2)
+    tgt_out = seq2.append([vocab2.index(start_token)])
+
+    return tgt_inp, tgt_out
+
+
+def load_data(text_addr, vocab_addr):
+    # Load the data
+    data_ = []
+    vocab = []
+    lengthes = 0
+    with open(text_addr, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    for line in lines:
+        line = line.lower()
+        line = line.replace("'", " ' ")
+        line = line.replace("-", " - ")
+        line = re.sub(r"([\w/'+$\s-]+|[^\w/'+$\s-]+)\s*", r"\1 ", line)
+
+        line = line.split()
+        # print(line)
+        lengthes += len(line)
+        data_.append(line)
+    print('average line length :', lengthes / len(lines))
+
+    vocab.append(empty_token)
+    with open(vocab_addr, 'r', encoding='utf-8') as vf:
+        lines = vf.readlines()
+    for line in lines:
+        vocab.append(line.split()[0])
+    # vocab = set(vocab)
+    return data_, vocab
+
+
+def data_by_ID_and_truncated(data, vocab, time_steps):
+    unk_idx = vocab.index(unknown_token)
+
+    data_ = []
+    for sen in data:
+        sen2 = []
+        for i in range(time_steps):
+            if i < len(sen):
+                if sen[i] in vocab:
+                    sen2.append(vocab.index(sen[i]))
+                else:
+                    sen2.append(unk_idx)
+            else:
+                sen2.append(vocab.index(empty_token))
+
+        data_.append(sen2)
+    return data_
+
 
 def batch(inputs, max_sequence_length=None):
     """
