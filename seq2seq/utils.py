@@ -12,7 +12,17 @@ def get_one_hot(idx, vocab_size):
     vec = np.zeros(vocab_size)
     vec[idx] = 1
     return vec
+def get_start_token_index(vocab):
+    return [vocab.index(start_token)]
 
+def sentence_by_id(sen, voacb):
+    li = []
+    for token in sen:
+        if token in voacb:
+            li.append(voacb.index(token))
+        else:
+            li.append(voacb.index(unknown_token))
+    return li
 
 def prepend_start(seq, vocab):
     return [vocab.index(start_token)] + seq
@@ -20,6 +30,7 @@ def prepend_start(seq, vocab):
 
 def append_end(seq, vocab):
     return [vocab.index(start_token)] + seq
+
 
 def load_data(text_addr, vocab_addr):
     # Load the data

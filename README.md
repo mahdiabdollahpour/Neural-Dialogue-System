@@ -23,3 +23,7 @@ using estimator
 
 converting string data to indexes takes long
 
+code is dirty I've got to clean it
+
+saving is not handled in seq2seq
+
