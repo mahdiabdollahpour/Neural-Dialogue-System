@@ -2,25 +2,29 @@ import tensorflow as tf
 import numpy as np
 
 from seq2seq.utils import *
+import os
+import global_utils
+
+how_many_lines = 50
+data1string, dict1, dict_rev1 = load_data_and_create_vocab('../datasets/it-en/en.txt', how_many_lines)
+data2string, dict2, dict_rev2 = load_data_and_create_vocab('../datasets/it-en/it.txt', how_many_lines)
+print('Data is read and vocab is created')
+source_sequence_length = 23
+decoder_lengths = 26
+data1 = data_by_ID_and_truncated(data1string, dict_rev1, source_sequence_length)
+data2 = data_by_ID_and_truncated(data2string, dict_rev2, decoder_lengths + 1,
+                                 append_and_prepend=True)
 
 
-class Seg2Seg:
+class Seq2Seq:
 
-    def __init__(self):
-        data1string, self.vocab1 = load_data('../datasets/train.en.txt', '../datasets/vocab.en.txt')
-        data2string, self.vocab2 = load_data('../datasets/train.vi.txt', '../datasets/vocab.vi.txt')
-        self.src_vocab_size = len(self.vocab1)
-        self.tgt_vocab_size = len(self.vocab2)
+    def __init__(self, path='saved_model'):
+
+        self.src_vocab_size = len(dict_rev1)
+        self.tgt_vocab_size = len(dict_rev2)
         # print(vocab1[:10])
         # print(vocab2[:10])
-        self.batch_size = 64
-        self.source_sequence_length = 23
-        self.decoder_lengths = 26
-
-        how_many_lines = 50
-        self.data1 = data_by_ID_and_truncated(data1string[:how_many_lines], self.vocab1, self.source_sequence_length)
-        self.data2 = data_by_ID_and_truncated(data2string[:how_many_lines], self.vocab2, self.decoder_lengths + 1,
-                                              append_and_prepend=True)
+        self.batch_size = 8
 
         embedding_size = 100
         hidden_num = 128
@@ -93,10 +97,17 @@ class Seg2Seg:
 
         self.loss_op = tf.reduce_mean(stepwise_cross_entropy)
         self.train_op = tf.train.AdamOptimizer().minimize(self.loss_op)
+        self.path = path
+        if not os.path.exists(path):
+            print('Model is being created')
+            os.makedirs(path)
+            self.load = False
+        else:
+            self.load = True
 
     def translate(self, src_sen):
         length = 30
-        by_index = sentence_by_id(src_sen, self.vocab1)
+        by_index = sentence_by_id(src_sen, dict_rev1)
         sequence = np.asarray(by_index)
         sequence = np.reshape(sequence, [-1, 1])
         # sequence[0][:] = by_index
@@ -104,10 +115,15 @@ class Seg2Seg:
             self.encoder_inputs_placeholder: sequence,
         }
         with tf.Session() as sess:
+
             sess.run(tf.global_variables_initializer())
+            saver = tf.train.Saver(tf.global_variables())
+
+            if self.load:
+                global_utils.check_restore_parameters(sess, saver, self.path + '\model.ckpt')
             thought_vector = sess.run([self.encoder_final_state], feed_dict)
             # thought_vector = thought_vector[-1]
-            inp = get_start_token_index(self.vocab1)
+            inp = get_start_token_index(dict_rev2)
             # print('fisr thought vector :',thought_vector)
             # print('-------------------------------------------')
             thought_vector = thought_vector[0]
@@ -122,36 +138,39 @@ class Seg2Seg:
                 word_predicted, thought_vector = sess.run([self.decoder_prediction, self.decoder_final_state_test],
                                                           feed_dict)
                 # print(word_predicted[0])
-                print(self.vocab2[word_predicted[0][0]])
+                print(dict2[word_predicted[0][0]])
                 inp = word_predicted[0]
 
     def train(self):
 
-        display_each = 100
-        import global_utils
+        display_each = 1000
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
+            saver = tf.train.Saver(tf.global_variables())
+            if self.load:
+                global_utils.check_restore_parameters(sess, saver, self.path + '\model.ckpt')
+
             num = global_utils.get_trainable_variables_num()
             print('Number of trainable variables ', num)
             iter_num = 200
-            number_of_batches = int(len(self.data1) / self.batch_size)
+            number_of_batches = int(len(data1) / self.batch_size)
             print('There are ', number_of_batches, ' batches')
             for i in range(iter_num):
                 iter_loss = 0
 
                 for j in range(number_of_batches):
-                    enc_inp = np.zeros((self.source_sequence_length, self.batch_size), dtype='int')
-                    dec_inp = np.zeros((self.decoder_lengths + 1, self.batch_size), dtype='int')
-                    dec_tgt_dummy = np.zeros((self.decoder_lengths + 1, self.batch_size), dtype='int')
-                    dec_tgt = np.zeros((self.decoder_lengths + 1, self.batch_size, self.tgt_vocab_size), dtype='int')
+                    enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
+                    dec_inp = np.zeros((decoder_lengths + 1, self.batch_size), dtype='int')
+                    dec_tgt_dummy = np.zeros((decoder_lengths + 1, self.batch_size), dtype='int')
+                    dec_tgt = np.zeros((decoder_lengths + 1, self.batch_size, self.tgt_vocab_size), dtype='int')
 
                     for idx in range(self.batch_size):
                         # print('input :', data2[j * batch_size + idx])
-                        dec_inp[:, idx] = self.data2[j * self.batch_size + idx][:-1]
-                        dec_tgt_dummy[:, idx] = self.data2[j * self.batch_size + idx][1:]
-                        enc_inp[:, idx] = self.data1[j * self.batch_size + idx]
-                        for t in range(self.decoder_lengths):
+                        dec_inp[:, idx] = data2[j * self.batch_size + idx][:-1]
+                        dec_tgt_dummy[:, idx] = data2[j * self.batch_size + idx][1:]
+                        enc_inp[:, idx] = data1[j * self.batch_size + idx]
+                        for t in range(decoder_lengths):
                             dec_tgt[t, idx, :] = get_one_hot(dec_tgt_dummy[t, idx], self.tgt_vocab_size)
 
                     feed_dict = {
@@ -169,8 +188,10 @@ class Seg2Seg:
                     if j % display_each == 0:
                         print('Mini batch loss is ', loss)
                 print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
+                print('Saving model')
+                saver.save(sess, self.path + '\model.ckpt')
 
 
-model = Seg2Seg()
+model = Seq2Seq()
 # model.train()
-model.translate("Rachel Pike : The science behind a climate headline")
+model.translate("Resumption of the session")

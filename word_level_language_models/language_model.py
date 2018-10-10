@@ -12,13 +12,13 @@ import random
 import time
 import numpy as np
 from word_level_language_models.utils import *
+from global_utils import *
 
-
-def check_restore_parameters(sess, saver, path):
-    """ Restore the previously trained parameters if there are any. """
-    ckpt = tf.train.get_checkpoint_state(os.path.dirname(path))
-    if ckpt and ckpt.model_checkpoint_path:
-        saver.restore(sess, ckpt.model_checkpoint_path)
+# def check_restore_parameters(sess, saver, path):
+#     """ Restore the previously trained parameters if there are any. """
+#     ckpt = tf.train.get_checkpoint_state(os.path.dirname(path))
+#     if ckpt and ckpt.model_checkpoint_path:
+#         saver.restore(sess, ckpt.model_checkpoint_path)
 
 
 # Training Parameters

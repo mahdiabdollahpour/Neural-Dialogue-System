@@ -16,20 +16,6 @@ class LSTM_NN:
         self.lr = tf.constant(lr)
         self.check_point_dir = check_point_dir
 
-        addr = check_point_dir
-        if create:
-            if not os.path.exists(addr):
-                os.makedirs(addr)
-            else:
-                raise Exception('a model with same name exits on this directory')
-            ## writing config to file
-            addr += '\config.txt'
-            with open(addr, 'w') as f:
-                print('writing config to ', addr)
-                f.write(str(self.in_size) + '\n')
-                f.write(str(self.out_size) + '\n')
-                f.write(str(self.hidden_size) + '\n')
-                f.write(str(self.num_layers) + '\n')
 
         ## Defining the computational graph
 
