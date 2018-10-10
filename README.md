@@ -13,17 +13,17 @@ given the previous ones
 
 #### TO DO
 
-Using state_is_tuple in char level
+- [ ] Using state_is_tuple in char level
 
-printing number of trainable parameter ==> done
+- [x] printing number of trainable parameter
 
-running word level with new changes
+- [ ] running word level with new changes
 
-using estimator
+- [ ] using estimator
 
-converting string data to indexes takes long
+- [ ] converting string data to indexes takes long
 
-code is dirty I've got to clean it
+- [ ] code is dirty I've got to clean it
 
-saving is not handled in seq2seq ==> done
+- [x] saving is not handled in seq2seq
 
