@@ -20,10 +20,13 @@ def decode_embed(array, vocab):
 
 def load_data(input):
     # Load the data
-    data_ = ""
+    data_ = []
     with open(input, 'r') as f:
-        data_ += f.read()
-    data_ = data_.lower()
+        lines = f.readlines()
+    for line in lines:
+        data_.append(line.lower())
+
+    # data_ = data_.lower()
     # Convert to 1-hot coding
     vocab = sorted(list(set(data_)))
     data = convert_to_one_hot(data_, vocab)
