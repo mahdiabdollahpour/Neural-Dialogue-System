@@ -109,3 +109,4 @@ test*.
 board/
 glove.6B/
 saved/
+datasets/it-en
