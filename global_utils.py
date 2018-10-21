@@ -34,16 +34,14 @@ def check_restore_parameters(sess, saver, path):
         saver.restore(sess, ckpt.model_checkpoint_path)
 
 
-def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length):
+def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length, src2=None, data_des2=None,trunc_length2=None):
     data_ = []
     vocab_list = []
     lengthes = 0
     # text = ""
     with open(src, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-        # text = f.read()
-    # lines = lines[:150]
-    for line in lines:
+    for line in lines[:200]:
         line = line.lower()
         line = line.replace("'", " ' ")
         line = line.replace("-", " - ")
@@ -58,12 +56,38 @@ def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length
         line = re.sub(r"([\w/'+$\s-]+|[^\w/'+$\s-]+)\s*", r"\1 ", line)
 
         line = line.split()
-        # print(line)
         data_.append(line)
         vocab_list += line
         lengthes += len(line)
         data_.append(line)
+    data_2 = []
     print('average line length :', lengthes / len(lines))
+    lengthes2 = 0
+    if src2 is not None:
+        with open(src2, 'r', encoding='utf-8') as f2:
+            lines = f2.readlines()
+        for line in lines[:200]:
+            line = line.lower()
+            line = line.replace("'", " ' ")
+            line = line.replace("-", " - ")
+            line = line.replace("(", " ( ")
+            line = line.replace(")", " ) ")
+            line = line.replace(".", " . ")
+            line = line.replace(":", " : ")
+            line = line.replace(";", " ; ")
+            line = line.replace("]", " ] ")
+            line = line.replace("]", " ] ")
+            line = line.replace(",", " , ")
+            line = re.sub(r"([\w/'+$\s-]+|[^\w/'+$\s-]+)\s*", r"\1 ", line)
+
+            line = line.split()
+            data_2.append(line)
+            vocab_list += line
+            lengthes2 += len(line)
+            data_2.append(line)
+    print('average line length :', lengthes2 / len(lines))
+
+
 
     # vocab_list = list(set(vocab_list))
     counter = Counter(vocab_list)
@@ -104,7 +128,26 @@ def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length
             seq2.append(end_idx)
         data_by_index['sen' + str(idx)] = seq2
     df2 = pd.DataFrame.from_dict(data_by_index)
+    data_by_index2 = {}
     df2.to_csv(data_des)
+    if data_des2 is not None:
+        for idx, seq in enumerate(data_2):
+            seq2 = []
+            seq2.append(start_idx)
+
+            for token in seq:
+                if len(seq2) == trunc_length2 - 1:
+                    seq2.append(end_idx)
+                    break
+                if token in dict_rev:
+                    seq2.append(dict_rev[token])
+                else:
+                    seq2.append(unk_idx)
+            while len(seq2) < trunc_length2:
+                seq2.append(end_idx)
+            data_by_index2['sen' + str(idx)] = seq2
+        df3 = pd.DataFrame.from_dict(data_by_index2)
+        df3.to_csv(data_des2)
 
 
 def load_vocab_and_data_from_csv(vocab_path, data_path):
@@ -133,8 +176,34 @@ def load_vocab_and_data_from_csv(vocab_path, data_path):
         dict_rev[token] = df[token][0]
     # print('end idx', dict_rev[end_token])
     # print('unknown idx', dict_rev[unknown_token])
-    return dict, dict_rev,data
+    return dict, dict_rev, data
 
 
 # create_vocab_and_data_file('datasets/it-en/en.txt', 'vocab-en.csv', 'data-en.csv', 100, 30)
-load_vocab_and_data_from_csv('vocab-en.csv', 'data-en.csv')
+# load_vocab_and_data_from_csv('vocab-en.csv', 'data-en.csv')
+
+
+def load_SQuAD(src, Q_des, A_des):
+    import json
+    with open(src, encoding='utf-8') as f:
+        data = f.read()
+        print(len(data))
+        j = json.loads(data)
+    quesion_list = []
+    answer_list = []
+    j = j['data']
+    for dat in j:
+        for da in dat['paragraphs']:
+            for dd in da['qas']:
+                for ans in dd['answers']:
+                    quesion_list.append(dd['question'])
+                    answer_list.append(ans['text'])
+    print(len(quesion_list))
+    with open(Q_des, encoding='utf-8', mode='w') as f2:
+        for line in quesion_list:
+            f2.write(line + '\n')
+    with open(A_des, encoding='utf-8', mode='w') as f3:
+        for line in answer_list:
+            f3.write(line + '\n')
+
+# load_SQuAD('datasets/SQuAD/train-v2.0.json', 'datasets/SQuAD/train_Q.txt','datasets/SQuAD/train_A.txt')

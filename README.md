@@ -15,15 +15,19 @@ given the previous ones
 
 - [ ] Using state_is_tuple in char level
 
-- [x] printing number of trainable parameter
+- [x] Printing number of trainable parameter
 
-- [ ] running word level with new changes
+- [ ] Running word level with new changes
 
-- [ ] using estimator
+- [ ] Using Estimator
 
-- [ ] converting string data to indexes takes long
+- [X] Converting string data to indexes takes long not to do it every time
 
-- [ ] code is dirty I've got to clean it
+- [ ] Code is dirty I've got to clean it
 
-- [x] saving is not handled in seq2seq
+- [x] Saving is not handled in seq2seq
+
+- [x] Plotting loss
+
+- [ ] Adding Dropout
 

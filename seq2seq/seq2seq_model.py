@@ -4,25 +4,53 @@ import numpy as np
 from seq2seq.utils import *
 import os
 import global_utils
+import json
 
-how_many_lines = 7441
+# how_many_lines = 7441
 # how_many_lines = 50
-data1string, dict1, dict_rev1 = load_data_and_create_vocab('../datasets/it-en/en.txt', how_many_lines)
-data2string, dict2, dict_rev2 = load_data_and_create_vocab('../datasets/it-en/it.txt', how_many_lines)
-print('Data is read and vocab is created')
-source_sequence_length = 23
-decoder_lengths = 26
-print('vocab len', len(dict1))
-print('vocab len target', len(dict2))
-data1 = data_by_ID_and_truncated(data1string, dict_rev1, source_sequence_length)
-data2 = data_by_ID_and_truncated(data2string, dict_rev2, decoder_lengths + 1,
-                                 append_and_prepend=True)
-print('sequences are made by indexes ')
+source_sequence_length = 15
+decoder_lengths = 6
+# create_vocab_and_data_file('../datasets/SQuAD/train_A.txt', '../datasets/SQuAD/vocab.csv',
+#                            '../datasets/SQuAD/data_A.csv', 5000, decoder_lengths, '../datasets/SQuAD/train_Q.txt',
+#                            '../datasets/SQuAD/data_Q.csv', source_sequence_length)
+#
+# create_vocab_and_data_file('../datasets/SQuAD/train_Q.txt', '../datasets/SQuAD/vocab_Q.csv',
+#                            '../datasets/SQuAD/data_Q.csv', 5000, source_sequence_length)
+
+
+print('Loading Data...')
+vocab1, dict_rev1, data1 = load_vocab_and_data_from_csv('../datasets/SQuAD/vocab.csv', '../datasets/SQuAD/data_Q.csv')
+vocab2, dict_rev2, data2 = load_vocab_and_data_from_csv('../datasets/SQuAD/vocab.csv', '../datasets/SQuAD/data_A.csv')
+print('Data is loaded')
 
 
 class Seq2Seq:
 
-    def __init__(self, path='saved_model'):
+    def __init__(self, path='saved_model', QA=True):
+        self.j = None
+        self.path = path
+        if not os.path.exists(path):
+            print('Model is being created')
+            os.makedirs(path)
+            conf = {}
+            with open(path + '\config.json', 'w', encoding='utf-8') as f:
+                conf['iteration'] = 0
+                conf['embedding_size'] = 100
+                conf['hidden_num'] = 128
+                print(conf)
+                self.j = json.dumps(conf)
+                print(self.j)
+                f.write(self.j)
+                f.flush()
+                self.j = json.loads(self.j)
+            self.load = False
+        else:
+            with open(path + '\config.json', 'r') as f:
+                stri = f.read()
+                print('content loaded :', stri)
+                self.j = json.loads(stri)
+            self.load = False
+            self.load = True
 
         self.src_vocab_size = len(dict_rev1)
         self.tgt_vocab_size = len(dict_rev2)
@@ -30,8 +58,9 @@ class Seq2Seq:
         # print(vocab2[:10])
         self.batch_size = 8
 
-        embedding_size = 100
-        hidden_num = 128
+        embedding_size = self.j['embedding_size']
+        hidden_num = self.j['hidden_num']
+
         self.encoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='encoder_inputs')
         self.decoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='decoder_inputs')
         self.decoder_targets_placeholder = tf.placeholder(shape=(None, None, self.tgt_vocab_size), dtype=tf.int32,
@@ -45,10 +74,14 @@ class Seq2Seq:
                                                                 self.decoder_init_state_placeholder1)
 
         embeddings1 = tf.Variable(tf.random_uniform([self.src_vocab_size, embedding_size], -1.0, 1.0), dtype=tf.float32)
-        embeddings2 = tf.Variable(tf.random_uniform([self.tgt_vocab_size, embedding_size], -1.0, 1.0), dtype=tf.float32)
+        if not QA:
+            embeddings2 = tf.Variable(tf.random_uniform([self.tgt_vocab_size, embedding_size], -1.0, 1.0),
+                                      dtype=tf.float32)
+            decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings2, self.decoder_inputs_placeholder)
+        else:
+            decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, self.decoder_inputs_placeholder)
 
         encoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, self.encoder_inputs_placeholder)
-        decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings2, self.decoder_inputs_placeholder)
 
         encoder_cell = tf.contrib.rnn.LSTMCell(hidden_num)
 
@@ -100,14 +133,9 @@ class Seq2Seq:
         )
 
         self.loss_op = tf.reduce_mean(stepwise_cross_entropy)
+        tf.summary.scalar("loss", self.loss_op)
         self.train_op = tf.train.AdamOptimizer().minimize(self.loss_op)
         self.path = path
-        if not os.path.exists(path):
-            print('Model is being created')
-            os.makedirs(path)
-            self.load = False
-        else:
-            self.load = True
 
     def translate(self, src_sen):
         length = 30
@@ -143,10 +171,10 @@ class Seq2Seq:
                 word_predicted, thought_vector = sess.run([self.decoder_prediction, self.decoder_final_state_test],
                                                           feed_dict)
                 # print(word_predicted[0])
-                print(dict2[word_predicted[0][0]])
+                print(vocab2[word_predicted[0][0]])
                 inp = word_predicted[0]
 
-    def train(self):
+    def train(self, logs_dir):
 
         display_each = 1000
 
@@ -158,25 +186,32 @@ class Seq2Seq:
 
             num = global_utils.get_trainable_variables_num()
             print('Number of trainable variables ', num)
-            iter_num = 200
+            iter_nums = 200
             number_of_batches = int(len(data1) / self.batch_size)
             print('There are ', number_of_batches, ' batches')
             import time
-            for i in range(iter_num):
+            start = self.j['iteration']
+            merged_summary = tf.summary.merge_all()
+
+            writer = tf.summary.FileWriter(logs_dir)
+
+            writer.add_graph(sess.graph)
+
+            for i in range(start, iter_nums):
                 iter_loss = 0
                 iter_time = time.time()
                 for j in range(number_of_batches):
                     enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
-                    dec_inp = np.zeros((decoder_lengths + 1, self.batch_size), dtype='int')
-                    dec_tgt_dummy = np.zeros((decoder_lengths + 1, self.batch_size), dtype='int')
-                    dec_tgt = np.zeros((decoder_lengths + 1, self.batch_size, self.tgt_vocab_size), dtype='int')
+                    dec_inp = np.zeros((decoder_lengths - 1, self.batch_size), dtype='int')
+                    dec_tgt_dummy = np.zeros((decoder_lengths - 1, self.batch_size), dtype='int')
+                    dec_tgt = np.zeros((decoder_lengths - 1, self.batch_size, self.tgt_vocab_size), dtype='int')
 
                     for idx in range(self.batch_size):
                         # print('input :', data2[j * batch_size + idx])
                         dec_inp[:, idx] = data2[j * self.batch_size + idx][:-1]
                         dec_tgt_dummy[:, idx] = data2[j * self.batch_size + idx][1:]
                         enc_inp[:, idx] = data1[j * self.batch_size + idx]
-                        for t in range(decoder_lengths):
+                        for t in range(decoder_lengths - 1):
                             dec_tgt[t, idx, :] = get_one_hot(dec_tgt_dummy[t, idx], self.tgt_vocab_size)
 
                     feed_dict = {
@@ -188,17 +223,23 @@ class Seq2Seq:
                     # print(np.shape(dec_inp))
                     # print(np.shape(dec_tgt))
 
-                    _, loss = sess.run([self.train_op, self.loss_op], feed_dict=feed_dict)
+                    _, s, loss = sess.run([self.train_op, merged_summary, self.loss_op], feed_dict=feed_dict)
                     # print(np.max(labe))
                     iter_loss += np.sum(loss)
                     if j % display_each == 0:
                         print('Mini batch loss is ', loss)
                 print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
                 print("It took ", time.time() - iter_time)
+                writer.add_summary(s, i)
                 print('Saving model')
+                self.j['iteration'] = i
+                with open(self.path + '\config.json', 'w', encoding='utf-8') as f:
+                    f.write(json.dumps(self.j))
+                    f.flush()
+
                 saver.save(sess, self.path + '\model.ckpt')
 
 
 model = Seq2Seq()
-model.train()
+model.train(logs_dir='board')
 # model.translate("good morning")
