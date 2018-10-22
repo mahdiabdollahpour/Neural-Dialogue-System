@@ -17,7 +17,7 @@ given the previous ones
 
 - [x] Printing number of trainable parameter
 
-- [ ] Running word level with new changes
+- [ ] Training the model
 
 - [ ] Using Estimator
 
@@ -29,5 +29,7 @@ given the previous ones
 
 - [x] Plotting loss
 
-- [ ] Adding Dropout
+- [x] Adding Dropout
+
+- [ ] Last batches are ignored , not getting to batch_size
 

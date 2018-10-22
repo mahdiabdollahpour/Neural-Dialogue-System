@@ -8,20 +8,26 @@ import json
 
 # how_many_lines = 7441
 # how_many_lines = 50
-source_sequence_length = 15
-decoder_lengths = 6
-# create_vocab_and_data_file('../datasets/SQuAD/train_A.txt', '../datasets/SQuAD/vocab.csv',
-#                            '../datasets/SQuAD/data_A.csv', 5000, decoder_lengths, '../datasets/SQuAD/train_Q.txt',
-#                            '../datasets/SQuAD/data_Q.csv', source_sequence_length)
-#
+source_sequence_length = 16
+decoder_lengths = 20
+create_vocab_and_data_file('../datasets/DailyDialog/train/A_train.txt', '../datasets/DailyDialog/vocab_low.csv',
+                           '../datasets/DailyDialog/train/data_A_low.csv', 4500, decoder_lengths,
+                           '../datasets/Dailydialog/train/Q_train.txt',
+                           '../datasets/DailyDialog/train/data_Q_low.csv', source_sequence_length)
+
 # create_vocab_and_data_file('../datasets/SQuAD/train_Q.txt', '../datasets/SQuAD/vocab_Q.csv',
 #                            '../datasets/SQuAD/data_Q.csv', 5000, source_sequence_length)
 
 
 print('Loading Data...')
-vocab1, dict_rev1, data1 = load_vocab_and_data_from_csv('../datasets/SQuAD/vocab.csv', '../datasets/SQuAD/data_Q.csv')
-vocab2, dict_rev2, data2 = load_vocab_and_data_from_csv('../datasets/SQuAD/vocab.csv', '../datasets/SQuAD/data_A.csv')
+vocab1, dict_rev1, data1 = load_vocab_and_data_from_csv('../datasets/DailyDialog/vocab_low.csv',
+                                                        '../datasets/DailyDialog/train/data_Q_low.csv')
+vocab2, dict_rev2, data2 = load_vocab_and_data_from_csv('../datasets/DailyDialog/vocab_low.csv',
+                                                        '../datasets/DailyDialog/train/data_A_low.csv')
 print('Data is loaded')
+print('vocab length is', len(dict_rev1))
+print('number of training examples', len(data1))
+print('number of training examples', len(data2))
 
 
 class Seq2Seq:
@@ -56,7 +62,7 @@ class Seq2Seq:
         self.tgt_vocab_size = len(dict_rev2)
         # print(vocab1[:10])
         # print(vocab2[:10])
-        self.batch_size = 8
+        self.batch_size = 64
 
         embedding_size = self.j['embedding_size']
         hidden_num = self.j['hidden_num']
@@ -118,22 +124,25 @@ class Seq2Seq:
             dtype=tf.float32, time_major=True, scope="plain_decoder_test",
         )
 
-        # print(self.encoder_final_state)
-        # exit()
-
-        decoder_logits = tf.contrib.layers.linear(self.decoder_outputs, self.tgt_vocab_size)
-        decoder_logits_test = tf.contrib.layers.linear(self.decoder_outputs_test, self.tgt_vocab_size)
-
-        self.decoder_prediction = tf.argmax(decoder_logits_test, 2)
+        decoder_logits_no_dropout = tf.contrib.layers.linear(self.decoder_outputs, self.tgt_vocab_size)
+        # adding dropout
+        decoder_logits = tf.layers.dropout(decoder_logits_no_dropout, 0.5, training=True, name='Dropout')
+        # decoder_logits_test = tf.contrib.layers.linear(self.decoder_outputs_test, self.tgt_vocab_size)
+        '''
+            is this computed only when needed???
+        '''
+        softmaxed = tf.nn.softmax(decoder_logits_no_dropout)
+        self.decoder_prediction = tf.argmax(softmaxed, 2)
         # labels = tf.one_hot(decoder_targets, depth=tgt_vocab_size, dtype=tf.float32)
         labels = self.decoder_targets_placeholder
         stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
             labels=labels,
             logits=decoder_logits,
         )
-
+        self.iter_loss_placeholder = tf.placeholder(tf.float32,name='iter_loss')
         self.loss_op = tf.reduce_mean(stepwise_cross_entropy)
-        tf.summary.scalar("loss", self.loss_op)
+        tf.summary.scalar("loss", self.iter_loss_placeholder)
+        self.merged_summary = tf.summary.merge_all()
         self.train_op = tf.train.AdamOptimizer().minimize(self.loss_op)
         self.path = path
 
@@ -176,7 +185,7 @@ class Seq2Seq:
 
     def train(self, logs_dir):
 
-        display_each = 1000
+        display_each = 200
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -191,7 +200,6 @@ class Seq2Seq:
             print('There are ', number_of_batches, ' batches')
             import time
             start = self.j['iteration']
-            merged_summary = tf.summary.merge_all()
 
             writer = tf.summary.FileWriter(logs_dir)
 
@@ -223,13 +231,16 @@ class Seq2Seq:
                     # print(np.shape(dec_inp))
                     # print(np.shape(dec_tgt))
 
-                    _, s, loss = sess.run([self.train_op, merged_summary, self.loss_op], feed_dict=feed_dict)
+                    _, loss = sess.run([self.train_op, self.loss_op], feed_dict=feed_dict)
                     # print(np.max(labe))
                     iter_loss += np.sum(loss)
                     if j % display_each == 0:
                         print('Mini batch loss is ', loss)
                 print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
                 print("It took ", time.time() - iter_time)
+                tf.summary.scalar('loss', iter_loss)
+                s = sess.run(self.merged_summary, feed_dict={self.iter_loss_placeholder:iter_loss/number_of_batches})
+                print(self.merged_summary)
                 writer.add_summary(s, i)
                 print('Saving model')
                 self.j['iteration'] = i

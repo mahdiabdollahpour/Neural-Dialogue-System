@@ -34,14 +34,15 @@ def check_restore_parameters(sess, saver, path):
         saver.restore(sess, ckpt.model_checkpoint_path)
 
 
-def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length, src2=None, data_des2=None,trunc_length2=None):
+def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length, src2=None, data_des2=None,
+                               trunc_length2=None):
     data_ = []
     vocab_list = []
     lengthes = 0
     # text = ""
     with open(src, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-    for line in lines[:200]:
+    for line in lines[:300]:
         line = line.lower()
         line = line.replace("'", " ' ")
         line = line.replace("-", " - ")
@@ -56,17 +57,17 @@ def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length
         line = re.sub(r"([\w/'+$\s-]+|[^\w/'+$\s-]+)\s*", r"\1 ", line)
 
         line = line.split()
-        data_.append(line)
+        # data_.append(line)
         vocab_list += line
         lengthes += len(line)
         data_.append(line)
     data_2 = []
-    print('average line length :', lengthes / len(lines))
+    print('Average line length :', lengthes / len(lines))
     lengthes2 = 0
     if src2 is not None:
         with open(src2, 'r', encoding='utf-8') as f2:
             lines = f2.readlines()
-        for line in lines[:200]:
+        for line in lines[:300]:
             line = line.lower()
             line = line.replace("'", " ' ")
             line = line.replace("-", " - ")
@@ -81,13 +82,11 @@ def create_vocab_and_data_file(src, vocab_des, data_des, vocab_len, trunc_length
             line = re.sub(r"([\w/'+$\s-]+|[^\w/'+$\s-]+)\s*", r"\1 ", line)
 
             line = line.split()
-            data_2.append(line)
+            # data_2.append(line)
             vocab_list += line
             lengthes2 += len(line)
             data_2.append(line)
-    print('average line length :', lengthes2 / len(lines))
-
-
+    print('Average line length :', lengthes2 / len(lines))
 
     # vocab_list = list(set(vocab_list))
     counter = Counter(vocab_list)
@@ -206,4 +205,28 @@ def load_SQuAD(src, Q_des, A_des):
         for line in answer_list:
             f3.write(line + '\n')
 
+
 # load_SQuAD('datasets/SQuAD/train-v2.0.json', 'datasets/SQuAD/train_Q.txt','datasets/SQuAD/train_A.txt')
+def load_DailyDialog(src, Q_des, A_des):
+    with open(src, mode='r', encoding='utf-8') as f:
+        data = f.read()
+        data = data.split('__eou__')
+    quesion_list = []
+    answer_list = []
+    for i in range(len(data) - 1):
+        line = data[i]
+        if line.__contains__('?'):
+            quesion_list.append(line.strip())
+            answer_list.append(data[i + 1].strip())
+    print(len(quesion_list))
+    print(len(answer_list))
+    with open(Q_des, encoding='utf-8', mode='w') as f2:
+        for line in quesion_list:
+            f2.write(line + '\n')
+    with open(A_des, encoding='utf-8', mode='w') as f3:
+        for line in answer_list:
+            f3.write(line + '\n')
+
+#
+# load_DailyDialog('datasets/DailyDialog/train/dialogues_train.txt', 'datasets/DailyDialog/train/Q_train.txt',
+#                  'datasets/DailyDialog/train/A_train.txt')
