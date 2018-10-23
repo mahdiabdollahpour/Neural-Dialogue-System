@@ -33,3 +33,5 @@ given the previous ones
 
 - [ ] Last batches are ignored , not getting to batch_size
 
+- [ ] Hanlde early stopping
+
