@@ -18,6 +18,10 @@ def get_start_token_index(dict_rev):
     return [dict_rev[start_token]]
 
 
+def get_token_index(dict_rev, token):
+    return [dict_rev[token]]
+
+
 def sentence_by_id(sen, dic_rev):
     li = []
     for token in sen:
@@ -26,4 +30,3 @@ def sentence_by_id(sen, dic_rev):
         else:
             li.append(dic_rev[unknown_token])
     return li
-
