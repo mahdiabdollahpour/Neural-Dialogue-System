@@ -116,12 +116,16 @@ class Seq2Seq:
         decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
             decoder_cell, attention_mechanism,
             attention_layer_size=hidden_num)
+
         self.decoder_lengths = tf.placeholder(tf.int32, shape=(self.batch_size), name="decoder_length")
+
         helper = tf.contrib.seq2seq.TrainingHelper(decoder_inputs_embedded, self.decoder_lengths, time_major=True)
 
         projection_layer = layers_core.Dense(
             self.tgt_vocab_size, use_bias=False)
+
         initial_state = decoder_cell.zero_state(self.batch_size, tf.float32).clone(cell_state=self.encoder_final_state)
+
         decoder = tf.contrib.seq2seq.BasicDecoder(
             decoder_cell, helper, initial_state,
             output_layer=projection_layer)
@@ -144,6 +148,7 @@ class Seq2Seq:
             gradients, hparams.max_gradient_norm)
 
         # Optimization
+        ## TODO: use specified learning rate
         optimizer = tf.train.AdamOptimizer()
         self.train_op = optimizer.apply_gradients(
             zip(clipped_gradients, params), global_step=global_step)
@@ -165,105 +170,48 @@ class Seq2Seq:
         # Dynamic decoding
         outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(
             inference_decoder, maximum_iterations=maximum_iterations)
+
         self.translations = outputs.sample_id
 
         self.iter_loss_placeholder = tf.placeholder(tf.float32, name='iter_loss')
         tf.summary.scalar("loss", self.iter_loss_placeholder)
         self.merged_summary = tf.summary.merge_all()
 
-        #
-        #
-        # self.decoder_outputs, self.decoder_final_state = tf.nn.dynamic_rnn(
-        #     decoder_cell, decoder_inputs_embedded,
-        #
-        #     initial_state=self.encoder_final_state,
-        #
-        #     dtype=tf.float32, time_major=True, scope="plain_decoder",
-        # )
-        #
-        # self.decoder_outputs_test, self.decoder_final_state_test = tf.nn.dynamic_rnn(
-        #     decoder_cell, decoder_inputs_embedded,
-        #
-        #     initial_state=initial_state_test_mode,
-        #
-        #     dtype=tf.float32, time_major=True, scope="plain_decoder_test",
-        # )
-        # ###TODO: inja bayad bayaye test_decoder ro linear bezani baraye test
-        # W = tf.get_variable(shape=(hidden_num, self.tgt_vocab_size), dtype=tf.float32, trainable=True, name='W',
-        #                     initializer=tf.initializers.random_uniform)
-        # B = tf.get_variable(shape=(self.tgt_vocab_size), dtype=tf.float32, trainable=True, name='B',
-        #                     initializer=tf.initializers.random_uniform)
-        #
-        # # print(self.decoder_outputs)
-        # # decoder_logits_no_dropout = tf.contrib.layers.linear(self.decoder_outputs, self.tgt_vocab_size)
-        # batch_time_shape = tf.shape(self.decoder_outputs_test)
-        # decoder_outputs_reshaped = tf.reshape(self.decoder_outputs, [-1, hidden_num])
-        # decoder_outputs_reshaped_test = tf.reshape(self.decoder_outputs_test, [-1, hidden_num])
-        #
-        # decoder_logits_no_dropout = tf.matmul(decoder_outputs_reshaped, W) + B
-        # decoder_logits_Test = tf.matmul(decoder_outputs_reshaped_test, W) + B
-        # # adding dropout
-        # decoder_logits = tf.layers.dropout(decoder_logits_no_dropout, 0.5, training=True, name='Dropout')
-        # # decoder_logits_test = tf.contrib.layers.linear(self.decoder_outputs_test, self.tgt_vocab_size)
-        #
-        # ##TODO:  is this computed only when needed???
-        #
-        # softmaxed = tf.nn.softmax(decoder_logits_Test)
-        # self.decoder_prediction = tf.argmax(
-        #     tf.reshape(softmaxed, (batch_time_shape[0], batch_time_shape[1], self.tgt_vocab_size))
-        #     , 2)
-        # # labels = tf.one_hot(decoder_targets, depth=tgt_vocab_size, dtype=tf.float32)
-        # ##TODO : may be synonym but differnt vectors
-        # labels = self.decoder_targets_placeholder
-        # stepwise_cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-        #     labels=tf.reshape(labels, [-1, self.tgt_vocab_size]),
-        #     logits=decoder_logits,
-        # )
-        # self.loss_op = tf.reduce_mean(stepwise_cross_entropy)
-        # self.train_op = tf.train.AdamOptimizer().minimize(self.loss_op)
-
     def translate(self, src_sen):
         length = 100
-        by_index = sentence_by_id(src_sen, dict_rev)
-        sequence = np.asarray(by_index)
-        sequence = np.reshape(sequence, [-1, 1])
-        # sequence[0][:] = by_index
-        feed_dict = {
-            self.encoder_inputs_placeholder: sequence,
-        }
-        answer = ""
-        with tf.Session() as sess:
+        src_sen_ = pad_sentence(src_sen.lower(), source_sequence_length)
 
+        by_index = sentence_by_id(src_sen_, dict_rev)
+        sequence = np.asarray(by_index)
+        # sequence = np.reshape(sequence, [-1, 1])
+        # sequence[0][:] = by_index
+        print('seq ', sequence)
+        inference_encoder_inputs = np.empty((source_sequence_length, self.batch_size))
+        for i in range(0, self.batch_size):
+            inference_encoder_inputs[:, i] = sequence
+
+        feed_dict = {
+            self.encoder_inputs_placeholder: inference_encoder_inputs,
+            self.decoder_lengths: np.ones((self.batch_size), dtype=int) * decoder_length
+
+        }
+
+        # answer = ""
+
+        with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver(tf.global_variables())
 
             if self.load:
                 print('loading')
                 global_utils.check_restore_parameters(sess, saver, self.path + '\model.ckpt')
-            thought_vector = sess.run([self.encoder_final_state], feed_dict)
-            # thought_vector = thought_vector[-1]
-            inp = get_start_token_index(dict_rev)
-            # print('fisr thought vector :',thought_vector)
-            # print('-------------------------------------------')
-            thought_vector = thought_vector[0]
-            for i in range(length):
-                # print(thought_vector)
-                # print('input word :',inp)
-                feed_dict = {
-                    self.decoder_inputs_placeholder: [inp],
-                    self.decoder_init_state_placeholder0: thought_vector.c,
-                    self.decoder_init_state_placeholder1: thought_vector.h
-                }
-                word_predicted, thought_vector = sess.run([self.decoder_prediction, self.decoder_final_state_test],
-                                                          feed_dict)
-                # print(word_predicted[0])
-                the_word = vocab[word_predicted[0][0]]
-                answer += the_word + " "
-                inp = word_predicted[0]
-                if the_word == global_utils.end_token:
-                    break
+            answer = sess.run([self.translations], feed_dict)
+
             print(src_sen)
-            print(answer)
+            answer = np.reshape(answer, [-1, self.batch_size])
+            # print(len(answer))
+            # print(answer[0])
+            print(get_sentence_back(answer[0],vocab))
 
     def train(self, logs_dir):
 
@@ -326,8 +274,8 @@ class Seq2Seq:
                 print(self.merged_summary)
                 writer.add_summary(s, i)
                 print('Saving model')
-                self.j['iteration'] = i
-                ## TODO: save i+1 (edit later)
+                ## TODO: save i+1 (edit later) ==> done
+                self.j['iteration'] = i + 1
                 with open(self.path + '\config.json', 'w', encoding='utf-8') as f:
                     f.write(json.dumps(self.j))
                     f.flush()
@@ -339,11 +287,7 @@ class Seq2Seq:
 
 
 model = Seq2Seq(path='Daily_QA_test')
-model.train(logs_dir='QA_Board_test')
+# model.train(logs_dir='QA_Board_test')
 
-# input_string = ' '
-# while input_string != 'q':
-#     input_string = input()
-#     if input_string == 'q':
-#         break
-#     model.translate(input_string.lower())
+input_string = input('Enter Question \n')
+model.translate(input_string.lower())

@@ -181,6 +181,20 @@ def load_vocab_from_csv(vocab_path):
     return dict, dict_rev
 
 
+def pad_sentence(sen, length):
+    sen_ = [start_token] + sen.split()
+    sen_ = sen_[:min(length, len(sen_)) - 1]
+    for i in range(len(sen_), length):
+        sen_.append(end_token)
+    return sen_
+
+
+def get_sentence_back(sen, vocab):
+    sent = ""
+    for token in sen:
+        sent += vocab[token] + " "
+    return sent
+
 # create_vocab_and_data_file('datasets/it-en/en.txt', 'vocab-en.csv', 'data-en.csv', 100, 30)
 # load_vocab_and_data_from_csv('vocab-en.csv', 'data-en.csv')
 
@@ -237,9 +251,6 @@ def load_DailyDialog(src, Q_des, A_des):
 
 def BLEU_score(ref_ans, output_ans):
     return nltk.translate.bleu_score.sentence_bleu([ref_ans], output_ans)
-
-
-
 
 #
 # create_vocab_file(src='datasets/DailyDialog/A_all.txt', vocab_len=16000, vocab_des='datasets/DailyDialog/vocab.csv',
