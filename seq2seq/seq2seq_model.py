@@ -15,7 +15,23 @@ decoder_length = 20
 print('Loading Data...')
 
 dataset_path = '../datasets/DailyDialog'
+
 vocab, dict_rev = load_vocab_from_csv(dataset_path + '/vocab.csv')
+#
+# create_data_file(src='../datasets/DailyDialog/validation/Q_validation.txt',
+#                  dict_rev=dict_rev, data_des='../datasets/DailyDialog/validation/Q_validation.csv',
+#                  trunc_length=source_sequence_length + 2)
+#
+# create_data_file(src='../datasets/DailyDialog/validation/A_validation.txt',
+#                  dict_rev=dict_rev, data_des='../datasets/DailyDialog/validation/A_validation.csv',
+#                  trunc_length=decoder_length + 1)
+#
+# create_data_file(src='../datasets/DailyDialog/train/Q_train.txt',
+#                  dict_rev=dict_rev, data_des='../datasets/DailyDialog/train/Q_train.csv',
+#                  trunc_length=source_sequence_length + 2)
+#
+# create_data_file(src='../datasets/DailyDialog/train/A_train.txt',
+#                  dict_rev=dict_rev, data_des='../datasets/DailyDialog/train/A_train.csv', trunc_length=decoder_length + 1)
 
 data1 = load_data_from_csv(dataset_path + '/train/Q_train.csv')
 data2 = load_data_from_csv(dataset_path + '/train/A_train.csv')
@@ -117,14 +133,16 @@ class Seq2Seq:
             decoder_cell, attention_mechanism,
             attention_layer_size=hidden_num)
 
-        self.decoder_lengths = tf.placeholder(tf.int32, shape=(self.batch_size), name="decoder_length")
+        self.decoder_lengths = tf.placeholder(tf.int32, shape=decoder_length, name="decoder_length")
+        print('decoder length ', self.decoder_lengths)
+        batch_size = tf.shape(self.decoder_lengths)[0]
 
         helper = tf.contrib.seq2seq.TrainingHelper(decoder_inputs_embedded, self.decoder_lengths, time_major=True)
 
         projection_layer = layers_core.Dense(
             self.tgt_vocab_size, use_bias=False)
 
-        initial_state = decoder_cell.zero_state(self.batch_size, tf.float32).clone(cell_state=self.encoder_final_state)
+        initial_state = decoder_cell.zero_state(batch_size, tf.float32).clone(cell_state=self.encoder_final_state)
 
         decoder = tf.contrib.seq2seq.BasicDecoder(
             decoder_cell, helper, initial_state,
@@ -132,7 +150,7 @@ class Seq2Seq:
 
         final_outputs, _final_state, _final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder)
         logits = final_outputs.rnn_output
-        self.decoder_targets_placeholder = tf.placeholder(tf.int32, shape=(self.batch_size, decoder_length))
+        self.decoder_targets_placeholder = tf.placeholder(dtype="int32", shape=(batch_size, decoder_length))
 
         # Loss
         self.loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -156,7 +174,7 @@ class Seq2Seq:
         # Inference
         inference_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
             embeddings2,
-            tf.fill([self.batch_size], int(dict_rev[start_token])), dict_rev[end_token])
+            tf.fill([batch_size], int(dict_rev[start_token])), dict_rev[end_token])
 
         # Inference Decoder
         inference_decoder = tf.contrib.seq2seq.BasicDecoder(
@@ -186,13 +204,15 @@ class Seq2Seq:
         # sequence = np.reshape(sequence, [-1, 1])
         # sequence[0][:] = by_index
         print('seq ', sequence)
-        inference_encoder_inputs = np.empty((source_sequence_length, self.batch_size))
-        for i in range(0, self.batch_size):
+        # num = self.batch_size
+        num = 1
+        inference_encoder_inputs = np.empty((source_sequence_length, 1))
+        for i in range(0, num):
             inference_encoder_inputs[:, i] = sequence
 
         feed_dict = {
             self.encoder_inputs_placeholder: inference_encoder_inputs,
-            self.decoder_lengths: np.ones((self.batch_size), dtype=int) * decoder_length
+            self.decoder_lengths: np.ones(num, dtype=int) * decoder_length
 
         }
 
@@ -211,7 +231,7 @@ class Seq2Seq:
             answer = np.reshape(answer, [-1, self.batch_size])
             # print(len(answer))
             # print(answer[0])
-            print(get_sentence_back(answer[0],vocab))
+            print(get_sentence_back(answer[0], vocab))
 
     def train(self, logs_dir):
 
@@ -241,22 +261,24 @@ class Seq2Seq:
                 for j in range(number_of_batches):
                     enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
                     dec_inp = np.zeros((decoder_length, self.batch_size), dtype='int')
-                    dec_tgt_dummy = np.zeros((decoder_length, self.batch_size), dtype='int')
+                    dec_tgt = np.zeros((decoder_length, self.batch_size), dtype='int')
                     # dec_tgt = np.zeros((decoder_length - 1, self.batch_size, self.tgt_vocab_size), dtype='int')
 
                     for idx in range(self.batch_size):
                         # print('input :', data2[j * batch_size + idx])
-                        dec_inp[:, idx] = data2[j * self.batch_size + idx]
-                        dec_tgt_dummy[:, idx] = data2[j * self.batch_size + idx]
-                        enc_inp[:, idx] = data1[j * self.batch_size + idx]
+                        dec_inp[:, idx] = data2[j * self.batch_size + idx][:-1]
+                        dec_tgt[:, idx] = data2[j * self.batch_size + idx][1:]
+                        enc_inp[:, idx] = data1[j * self.batch_size + idx][1:-1]
                         # for t in range(decoder_length - 1):
                         #     dec_tgt[t, idx, :] = get_one_hot(dec_tgt_dummy[t, idx], self.tgt_vocab_size)
-
+                        print(np.shape(dec_inp))
+                        print(np.shape(dec_tgt))
+                        print(np.shape(enc_inp))
                     feed_dict = {
                         self.encoder_inputs_placeholder: enc_inp,
                         self.decoder_inputs_placeholder: dec_inp,
-                        self.decoder_targets_placeholder: np.transpose(dec_tgt_dummy),
-                        self.decoder_lengths: np.ones((self.batch_size), dtype=int) * decoder_length
+                        self.decoder_targets_placeholder: np.transpose(dec_tgt),
+                        self.decoder_lengths: np.ones((self.batch_size), dtype=int) * (decoder_length)
                     }
                     # print(np.shape(enc_inp))
                     # print(np.shape(dec_inp))
