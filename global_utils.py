@@ -36,10 +36,8 @@ def check_restore_parameters(sess, saver, path):
 
 
 def create_vocab_file(src, vocab_des, vocab_len, src2=None):
-    data_ = []
     vocab_list = []
     lengthes = 0
-    # text = ""
     with open(src, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     for line in lines:
@@ -60,8 +58,7 @@ def create_vocab_file(src, vocab_des, vocab_len, src2=None):
         # data_.append(line)
         vocab_list += line
         lengthes += len(line)
-        data_.append(line)
-    data_2 = []
+
     print('Average line length :', lengthes / len(lines))
     lengthes2 = 0
     if src2 is not None:
@@ -85,7 +82,7 @@ def create_vocab_file(src, vocab_des, vocab_len, src2=None):
             # data_2.append(line)
             vocab_list += line
             lengthes2 += len(line)
-            data_2.append(line)
+
     print('Average line length :', lengthes2 / len(lines))
 
     # vocab_list = list(set(vocab_list))
@@ -100,11 +97,10 @@ def create_vocab_file(src, vocab_des, vocab_len, src2=None):
     print('Vocab length :', len(most_occure))
     counter = 0
     for (token, i) in most_occure:
-        # dict[i] = token
-        dict_rev[token] = counter
         counter += 1
-    df = pd.DataFrame(dict_rev, index=[0])
-    # print(df)
+        dict_rev[token] = counter
+    df = pd.DataFrame(dict_rev,index=[0])
+    print("Vocab created, size :",len(dict_rev))
     df.to_csv(vocab_des)
 
 
@@ -176,6 +172,9 @@ def load_vocab_from_csv(vocab_path):
     dict = {}
     dict_rev = {}
     for i, token in enumerate(cols):
+        # print(df[token][0] , ' --- ', token)
+        # if(df[token][0] == 15575):
+        #     exit()
         dict[df[token][0]] = token
         dict_rev[token] = df[token][0]
     return dict, dict_rev
@@ -194,6 +193,7 @@ def get_sentence_back(sen, vocab):
     for token in sen:
         sent += vocab[token] + " "
     return sent
+
 
 # create_vocab_and_data_file('datasets/it-en/en.txt', 'vocab-en.csv', 'data-en.csv', 100, 30)
 # load_vocab_and_data_from_csv('vocab-en.csv', 'data-en.csv')
