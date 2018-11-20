@@ -172,7 +172,7 @@ def load_vocab_from_csv(vocab_path):
     dict = {}
     dict_rev = {}
     for i, token in enumerate(cols[1:]):
-        print(df[token][0] , ' --- ', token)
+        # print(df[token][0] , ' --- ', token)
         # if(df[token][0] == 15575):
         #     exit()
         dict[df[token][0]] = token
@@ -191,6 +191,7 @@ def pad_sentence(sen, length):
 def get_sentence_back(sen, vocab):
     sent = ""
     for token in sen:
+        # print(token)
         sent += vocab[token] + " "
     return sent
 

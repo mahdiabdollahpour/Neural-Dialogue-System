@@ -2,14 +2,11 @@ import tensorflow as tf
 import numpy as np
 
 from seq2seq.utils import *
-import os
 from global_utils import *
-
+import time
 import json
 from tensorflow.python.layers import core as layers_core
 
-# how_many_lines = 7441
-# how_many_lines = 50
 source_sequence_length = 16
 decoder_length = 20
 
@@ -48,311 +45,310 @@ print('Number of training examples', len(data2))
 hparams = tf.contrib.training.HParams(
 
     max_gradient_norm=5.0,
+    batch_size=64,
+    hidden_num=128,
+    embed_size=100,
+    lr=0.001
 
 )
 
+global json_loaded_data
+global path
+global train_op
+global loss
+global encoder_inputs_placeholder
+global decoder_inputs_placeholder
+global decoder_lengths
+global translations
+global decoder_targets_placeholder
+global load
+global merged_summary
 
-class Seq2Seq:
+model_file_name =  '\model.ckpt'
+def define_graph(address='saved_model', QA=True):
+    global train_op
+    global loss_op
+    global encoder_inputs_placeholder
+    global decoder_inputs_placeholder
+    global decoder_lengths
+    global translations
+    global decoder_targets_placeholder
+    global load
+    global merged_summary
+    global path
+    global json_loaded_data
 
-    def __init__(self, path='saved_model', QA=True):
-        self.j = None
-        self.path = path
-        if not os.path.exists(path):
-            print('Model is being created')
-            os.makedirs(path)
-            conf = {}
-            with open(path + '\config.json', 'w', encoding='utf-8') as f:
-                conf['iteration'] = 0
-                conf['embedding_size'] = 100
-                conf['hidden_num'] = 128
-                print(conf)
-                self.j = json.dumps(conf)
-                print(self.j)
-                f.write(self.j)
-                f.flush()
-                self.j = json.loads(self.j)
-            self.load = False
-        else:
-            with open(path + '\config.json', 'r') as f:
-                stri = f.read()
-                print('content loaded :', stri)
-                self.j = json.loads(stri)
-            self.load = False
-            self.load = True
+    path = address
+    if not os.path.exists(path):
+        print('Model is being created')
+        os.makedirs(path)
+        conf = {}
+        with open(path + '\config.json', 'w', encoding='utf-8') as f:
+            # global json_loaded_data
 
-        self.path = path
-        self.src_vocab_size = len(dict_rev)
-        self.tgt_vocab_size = len(dict_rev)
-        # print(vocab1[:10])
-        # print(vocab2[:10])
-        self.batch_size = 64
-        embedding_size = self.j['embedding_size']
-        hidden_num = self.j['hidden_num']
+            conf['iteration'] = 0
+            conf['embedding_size'] = hparams.embed_size
+            conf['hidden_num'] = hparams.hidden_num
+            print(conf)
+            json_string = json.dumps(conf)
+            print(json_string)
+            f.write(json_string)
+            f.flush()
+            json_loaded_data = json.loads(json_string)
+        load = False
+    else:
+        with open(path + '\config.json', 'r') as f:
+            # global json_loaded_data
 
-        self.encoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='encoder_inputs')
-        self.decoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='decoder_inputs')
-        # self.decoder_targets_placeholder = tf.placeholder(shape=(None, None, self.tgt_vocab_size), dtype=tf.int32,
-        #                                                   name='decoder_targets')
-        #
+            stri = f.read()
+            print('content loaded :', stri)
+            json_loaded_data = json.loads(stri)
+        # load = False
+        load = True
 
-        #
-        # self.decoder_init_state_placeholder0 = tf.placeholder(shape=(None), dtype=tf.float32,
-        #                                                       name='decoder_init_sate0')
-        # self.decoder_init_state_placeholder1 = tf.placeholder(shape=(None), dtype=tf.float32,
-        #                                                       name='decoder_init_sate1')
-        #
-        # initial_state_test_mode = tf.nn.rnn_cell.LSTMStateTuple(self.decoder_init_state_placeholder0,
-        #                                                         self.decoder_init_state_placeholder1)
 
-        embeddings1 = tf.Variable(tf.random_uniform([self.src_vocab_size, embedding_size], -1.0, 1.0))
-        if not QA:
-            embeddings2 = tf.Variable(tf.random_uniform([self.tgt_vocab_size, embedding_size], -1.0, 1.0))
-            decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings2, self.decoder_inputs_placeholder)
-        else:  # QA
+    src_vocab_size = len(dict_rev)
+    tgt_vocab_size = len(dict_rev)
 
-            decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, self.decoder_inputs_placeholder)
-            embeddings2 = embeddings1
+    print(json_loaded_data)
+    embedding_size = json_loaded_data['embedding_size']
+    hidden_num = json_loaded_data['hidden_num']
 
-        encoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, self.encoder_inputs_placeholder)
+    encoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='encoder_inputs')
+    decoder_inputs_placeholder = tf.placeholder(shape=(None, None), dtype=tf.int32, name='decoder_inputs')
 
-        encoder_cell = tf.contrib.rnn.LSTMCell(hidden_num)
+    embeddings1 = tf.Variable(tf.random_uniform([src_vocab_size, embedding_size], -1.0, 1.0))
+    embeddings2 = None
+    if not QA:
+        embeddings2 = tf.Variable(tf.random_uniform([tgt_vocab_size, embedding_size], -1.0, 1.0))
+        decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings2, decoder_inputs_placeholder)
+    else:  # QA
+        decoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, decoder_inputs_placeholder)
+        embeddings2 = embeddings1
 
-        encoder_outputs, self.encoder_final_state = tf.nn.dynamic_rnn(
-            encoder_cell, encoder_inputs_embedded,
-            dtype=tf.float32, time_major=True,
-        )
-        # del encoder_outputs
-        attention_states = tf.transpose(encoder_outputs, [1, 0, 2])
+    encoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, encoder_inputs_placeholder)
 
-        # Create an attention mechanism
-        attention_mechanism = tf.contrib.seq2seq.LuongAttention(
-            hidden_num, attention_states,
-            memory_sequence_length=None)
+    encoder_cell = tf.contrib.rnn.LSTMCell(hidden_num)
 
-        decoder_cell = tf.contrib.rnn.LSTMCell(hidden_num)
-        decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
-            decoder_cell, attention_mechanism,
-            attention_layer_size=hidden_num)
+    encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(
+        encoder_cell, encoder_inputs_embedded,
+        dtype=tf.float32, time_major=True,
+    )
+    # del encoder_outputs
+    attention_states = tf.transpose(encoder_outputs, [1, 0, 2])
 
-        self.decoder_lengths = tf.placeholder(tf.int32, shape=self.batch_size, name="decoder_length")
-        print('decoder length ', self.decoder_lengths)
-        # batch_size = tf.shape(self.decoder_lengths)[0]
+    # Create an attention mechanism
+    attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+        hidden_num, attention_states,
+        memory_sequence_length=None)
 
-        helper = tf.contrib.seq2seq.TrainingHelper(decoder_inputs_embedded, self.decoder_lengths, time_major=True)
+    decoder_cell = tf.contrib.rnn.LSTMCell(hidden_num)
+    decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
+        decoder_cell, attention_mechanism,
+        attention_layer_size=hidden_num)
 
-        projection_layer = layers_core.Dense(
-            self.tgt_vocab_size, use_bias=False)
+    decoder_lengths = tf.placeholder(tf.int32, shape=hparams.batch_size, name="decoder_length")
+    print('decoder length ', decoder_lengths)
+    # batch_size = tf.shape( decoder_lengths)[0]
 
-        initial_state = decoder_cell.zero_state(self.batch_size, tf.float32).clone(cell_state=self.encoder_final_state)
+    helper = tf.contrib.seq2seq.TrainingHelper(decoder_inputs_embedded, decoder_lengths, time_major=True)
 
-        decoder = tf.contrib.seq2seq.BasicDecoder(
-            decoder_cell, helper, initial_state,
-            output_layer=projection_layer)
+    projection_layer = layers_core.Dense(
+        tgt_vocab_size, use_bias=False)
 
-        final_outputs, _final_state, _final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder)
-        logits = final_outputs.rnn_output
-        self.decoder_targets_placeholder = tf.placeholder(dtype="int32", shape=(self.batch_size, decoder_length))
+    initial_state = decoder_cell.zero_state(hparams.batch_size, tf.float32).clone(cell_state=encoder_final_state)
 
-        # Loss
-        self.loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            labels=self.decoder_targets_placeholder, logits=logits)
+    decoder = tf.contrib.seq2seq.BasicDecoder(
+        decoder_cell, helper, initial_state,
+        output_layer=projection_layer)
 
-        # Train
-        global_step = tf.Variable(0, name='global_step', trainable=False)
+    final_outputs, _final_state, _final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder)
+    logits = final_outputs.rnn_output
+    decoder_targets_placeholder = tf.placeholder(dtype="int32", shape=(hparams.batch_size, decoder_length))
 
-        # Calculate and clip gradients
-        params = tf.trainable_variables()
-        gradients = tf.gradients(self.loss_op, params)
-        clipped_gradients, _ = tf.clip_by_global_norm(
-            gradients, hparams.max_gradient_norm)
+    # Loss
+    loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=decoder_targets_placeholder, logits=logits)
 
-        # Optimization
-        ## TODO: use specified learning rate
-        optimizer = tf.train.AdamOptimizer()
-        self.train_op = optimizer.apply_gradients(
-            zip(clipped_gradients, params), global_step=global_step)
+    # Train
+    global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        # Inference
-        inference_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-            embeddings2,
-            tf.fill([self.batch_size], int(dict_rev[start_token])), dict_rev[end_token])
+    # Calculate and clip gradients
+    params = tf.trainable_variables()
+    gradients = tf.gradients(loss_op, params)
+    clipped_gradients, _ = tf.clip_by_global_norm(
+        gradients, hparams.max_gradient_norm)
 
-        # Inference Decoder
-        inference_decoder = tf.contrib.seq2seq.BasicDecoder(
-            decoder_cell, inference_helper, initial_state,
-            output_layer=projection_layer)
+    # Optimization
+    ## TODO: use specified learning rate
+    optimizer = tf.train.AdamOptimizer(hparams.lr)
+    train_op = optimizer.apply_gradients(
+        zip(clipped_gradients, params), global_step=global_step)
 
-        # We should specify maximum_iterations, it can't stop otherwise.
-        # source_sequence_length = hparams.encoder_length
-        maximum_iterations = tf.round(tf.reduce_max(source_sequence_length) * 2)
+    # Inference
+    inference_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(embeddings2,
+                                                                tf.fill([hparams.batch_size],
+                                                                        int(dict_rev[start_token])),
+                                                                dict_rev[end_token])
 
-        # Dynamic decoding
-        outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(
-            inference_decoder, maximum_iterations=maximum_iterations)
+    # Inference Decoder
+    inference_decoder = tf.contrib.seq2seq.BasicDecoder(
+        decoder_cell, inference_helper, initial_state,
+        output_layer=projection_layer)
 
-        self.translations = outputs.sample_id
+    # We should specify maximum_iterations, it can't stop otherwise.
+    # source_sequence_length = hparams.encoder_length
+    maximum_iterations = tf.round(tf.reduce_max(source_sequence_length) * 2)
 
-        self.iter_loss_placeholder = tf.placeholder(tf.float32, name='iter_loss')
-        tf.summary.scalar("loss", self.iter_loss_placeholder)
-        self.merged_summary = tf.summary.merge_all()
+    # Dynamic decoding
+    outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(
+        inference_decoder, maximum_iterations=maximum_iterations)
 
-    def translate(self, src_sen):
-        length = 100
+    translations = outputs.sample_id
 
-        src_sen_ = pad_sentence(src_sen.lower(), source_sequence_length)
 
-        by_index = sentence_by_id(src_sen_, dict_rev)
-        sequence = np.asarray(by_index)
-        # sequence = np.reshape(sequence, [-1, 1])
-        # sequence[0][:] = by_index
-        print('seq ', sequence)
-        # num = self.batch_size
-        # num = 1
-        inference_encoder_inputs = np.empty((source_sequence_length, self.batch_size))
-        for i in range(0, self.batch_size):
-            inference_encoder_inputs[:, i] = sequence
 
-        feed_dict = {
-            self.encoder_inputs_placeholder: inference_encoder_inputs,
-            self.decoder_lengths: np.ones(self.batch_size, dtype=int) * decoder_length
+def translate(src_sen):
+    src_sen_ = pad_sentence(src_sen.lower(), source_sequence_length)
 
-        }
+    by_index = sentence_by_id(src_sen_, dict_rev)
+    sequence = np.asarray(by_index)
+    print('seq ', sequence)
 
-        # answer = ""
+    inference_encoder_inputs = np.empty((source_sequence_length, hparams.batch_size))
+    for i in range(0, hparams.batch_size):
+        inference_encoder_inputs[:, i] = sequence
 
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
-            saver = tf.train.Saver(tf.global_variables())
+    feed_dict = {
+        encoder_inputs_placeholder: inference_encoder_inputs,
+        decoder_lengths: np.ones(hparams.batch_size, dtype=int) * decoder_length
 
-            if self.load:
-                print('loading')
-                check_restore_parameters(sess, saver, self.path + '\model.ckpt')
-            answer = sess.run([self.translations], feed_dict)
+    }
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        saver = tf.train.Saver(tf.global_variables())
 
-            print(src_sen)
-            answer = np.reshape(answer, [-1, self.batch_size])
-            # print(len(answer))
-            # print(answer[0])
-            print(get_sentence_back(answer[0], vocab))
+        if load:
+            print('loading')
+            check_restore_parameters(sess, saver, path + model_file_name)
+        answer = sess.run([translations], feed_dict)
 
-    def compute_blue(self, questions, score_func, session=None):
-        with open(dataset_path + '/validation/A_validation.txt', encoding='utf-8') as f:
-            A_lines = f.readlines()
-        # with open(dataset_path + '/validation/Q_validation.txt', encoding='utf-8') as f:
-        #     Q_lines = f.readlines()
-        answers_given = []
-        number_of_batches = int(len(A_lines) / self.batch_size)
-        if session is None:
-            session = tf.Session()
-            session.run(tf.global_variables_initializer())
-            saver = tf.train.Saver(tf.global_variables())
-            if self.load:
-                print('loading Model')
-                check_restore_parameters(session, saver, self.path + '\model.ckpt')
+        print(src_sen)
+        answer = np.reshape(answer, [-1, hparams.batch_size])
+        print(get_sentence_back(answer[0], vocab))
 
-        with session as sess:
 
-            for j in range(0, number_of_batches):
-                enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
+def compute_blue(questions, score_func, session=None):
+    with open(dataset_path + '/validation/A_validation.txt', encoding='utf-8') as f:
+        A_lines = f.readlines()
 
-                for idx in range(self.batch_size):
-                    enc_inp[:, idx] = questions[j * self.batch_size + idx][1:-1]
+    answers_given = []
+    number_of_batches = int(len(A_lines) / hparams.batch_size)
+    if session is None:
+        session = tf.Session()
+        session.run(tf.global_variables_initializer())
+        saver = tf.train.Saver(tf.global_variables())
+        if load:
+            print('loading Model')
+            check_restore_parameters(session, saver, path + model_file_name)
+
+    with session as sess:
+
+        for j in range(0, number_of_batches):
+            enc_inp = np.zeros((source_sequence_length, hparams.batch_size), dtype='int')
+
+            for idx in range(hparams.batch_size):
+                enc_inp[:, idx] = questions[j * hparams.batch_size + idx][1:-1]
+
+            feed_dict = {
+                encoder_inputs_placeholder: enc_inp,
+                decoder_lengths: np.ones((hparams.batch_size), dtype=int) * (decoder_length)
+            }
+            trans = sess.run([translations], feed_dict=feed_dict)
+            # print('trans_shape :', np.shape(trans))
+            trans = np.reshape(trans, [-1, hparams.batch_size])
+            for sen in trans:
+                # print('sen', sen)
+                answers_given.append(get_sentence_back(sen, vocab))
+
+    score = score_func(A_lines[:number_of_batches * hparams.batch_size], answers_given)
+
+    return score
+
+
+def train(logs_dir):
+    display_each = 200
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        saver = tf.train.Saver(tf.global_variables())
+        global path
+        if load:
+            check_restore_parameters(sess, saver, path + model_file_name)
+
+        num = get_trainable_variables_num()
+        print('Number of trainable variables ', num)
+        iter_nums = 120
+        number_of_batches = int(len(data1) / hparams.batch_size)
+        print('There are ', number_of_batches, ' batches')
+        global json_loaded_data
+        start = json_loaded_data['iteration']
+
+        writer = tf.summary.FileWriter(logs_dir)
+
+        writer.add_graph(sess.graph)
+        ## TODO: do Early Stopping
+        for i in range(start, iter_nums):
+            iter_loss = 0
+            iter_time = time.time()
+            for j in range(number_of_batches):
+                enc_inp = np.zeros((source_sequence_length, hparams.batch_size), dtype='int')
+                dec_inp = np.zeros((decoder_length, hparams.batch_size), dtype='int')
+                dec_tgt = np.zeros((decoder_length, hparams.batch_size), dtype='int')
+                # dec_tgt = np.zeros((decoder_length - 1,  batch_size,  tgt_vocab_size), dtype='int')
+
+                for idx in range(hparams.batch_size):
+                    # print('input :', data2[j * batch_size + idx])
+                    dec_inp[:, idx] = data2[j * hparams.batch_size + idx][:-1]
+                    dec_tgt[:, idx] = data2[j * hparams.batch_size + idx][1:]
+                    enc_inp[:, idx] = data1[j * hparams.batch_size + idx][1:-1]
 
                 feed_dict = {
-                    self.encoder_inputs_placeholder: enc_inp,
-                    self.decoder_lengths: np.ones((self.batch_size), dtype=int) * (decoder_length)
+                    encoder_inputs_placeholder: enc_inp,
+                    decoder_inputs_placeholder: dec_inp,
+                    decoder_targets_placeholder: np.transpose(dec_tgt),
+                    decoder_lengths: np.ones((hparams.batch_size), dtype=int) * (decoder_length)
                 }
-                trans = sess.run([self.translations], feed_dict=feed_dict)
-                # print('trans_shape :', np.shape(trans))
-                trans = np.reshape(trans, [-1, self.batch_size])
-                for sen in trans:
-                    # print('sen', sen)
-                    answers_given.append(get_sentence_back(sen, vocab))
+
+                global loss_op
+                global train_op
+                global iter_loss_placeholder
+                _, loss = sess.run([train_op, loss_op], feed_dict=feed_dict)
+                # print(np.max(labe))
+                iter_loss += np.mean(loss)
+                if j % display_each == 0:
+                    print('Mini batch loss is ', np.mean(loss))
+            print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
+            print("It took ", time.time() - iter_time)
+            # tf.summary.scalar('loss', iter_loss)
+            iter_loss_placeholder = tf.placeholder(tf.float32, name='iter_loss')
+            tf.summary.scalar("loss", iter_loss_placeholder)
+            merged_summary = tf.summary.merge_all()
+
+            s = sess.run(merged_summary, feed_dict={iter_loss_placeholder: iter_loss / number_of_batches})
+            print(merged_summary)
+            writer.add_summary(s, i)
+            print('Saving model')
+            ## TODO: save i+1 (edit later) ==> done
+            json_loaded_data['iteration'] = i + 1
+            with open(path + '\config.json', 'w', encoding='utf-8') as f:
+                f.write(json.dumps(json_loaded_data))
+                f.flush()
+
+            saver.save(sess, path + model_file_name)
 
 
-        score = score_func(A_lines[:number_of_batches * self.batch_size], answers_given)
+define_graph('new_model',True)
+# train('new_logs')
+# translate('How are you doing ? ')
+# compute_blue(data1_validation,BLEU_score)
 
-        return score
-
-
-    def train(self, logs_dir):
-        display_each = 200
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
-            saver = tf.train.Saver(tf.global_variables())
-            if self.load:
-                check_restore_parameters(sess, saver, self.path + '\model.ckpt')
-
-            num = get_trainable_variables_num()
-            print('Number of trainable variables ', num)
-            iter_nums = 120
-            number_of_batches = int(len(data1) / self.batch_size)
-            print('There are ', number_of_batches, ' batches')
-            import time
-            start = self.j['iteration']
-
-            writer = tf.summary.FileWriter(logs_dir)
-
-            writer.add_graph(sess.graph)
-            ## TODO: do Early Stopping
-            for i in range(start, iter_nums):
-                iter_loss = 0
-                iter_time = time.time()
-                for j in range(number_of_batches):
-                    enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
-                    dec_inp = np.zeros((decoder_length, self.batch_size), dtype='int')
-                    dec_tgt = np.zeros((decoder_length, self.batch_size), dtype='int')
-                    # dec_tgt = np.zeros((decoder_length - 1, self.batch_size, self.tgt_vocab_size), dtype='int')
-
-                    for idx in range(self.batch_size):
-                        # print('input :', data2[j * batch_size + idx])
-                        dec_inp[:, idx] = data2[j * self.batch_size + idx][:-1]
-                        dec_tgt[:, idx] = data2[j * self.batch_size + idx][1:]
-                        enc_inp[:, idx] = data1[j * self.batch_size + idx][1:-1]
-                        # for t in range(decoder_length - 1):
-                        #     dec_tgt[t, idx, :] = get_one_hot(dec_tgt_dummy[t, idx], self.tgt_vocab_size)
-                        # print(np.shape(dec_inp))
-                        # print(np.shape(dec_tgt))
-                        # print(np.shape(enc_inp))
-                    feed_dict = {
-                        self.encoder_inputs_placeholder: enc_inp,
-                        self.decoder_inputs_placeholder: dec_inp,
-                        self.decoder_targets_placeholder: np.transpose(dec_tgt),
-                        self.decoder_lengths: np.ones((self.batch_size), dtype=int) * (decoder_length)
-                    }
-                    # print(np.shape(enc_inp))
-                    # print(np.shape(dec_inp))
-                    # print(np.shape(dec_tgt))
-
-                    _, loss = sess.run([self.train_op, self.loss_op], feed_dict=feed_dict)
-                    # print(np.max(labe))
-                    iter_loss += np.mean(loss)
-                    if j % display_each == 0:
-                        print('Mini batch loss is ', np.mean(loss))
-                print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
-                print("It took ", time.time() - iter_time)
-                tf.summary.scalar('loss', iter_loss)
-                s = sess.run(self.merged_summary, feed_dict={self.iter_loss_placeholder: iter_loss / number_of_batches})
-                print(self.merged_summary)
-                writer.add_summary(s, i)
-                print('Saving model')
-                ## TODO: save i+1 (edit later) ==> done
-                self.j['iteration'] = i + 1
-                with open(self.path + '\config.json', 'w', encoding='utf-8') as f:
-                    f.write(json.dumps(self.j))
-                    f.flush()
-
-                saver.save(sess, self.path + '\model.ckpt')
-
-
-# model = Seq2Seq(path='saved_seq2seq')
-
-
-# model = Seq2Seq(path='Daily_QA_with_Attention')
-# model.train(logs_dir='QA_Board_test')
-
-# input_string = input('Enter Question \n')
-# model.translate(input_string.lower())
-
-# score = model.compute_blue(data1_validation, BLEU_score)
-# print(score)
