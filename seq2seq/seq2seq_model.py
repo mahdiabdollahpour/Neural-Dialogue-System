@@ -3,7 +3,8 @@ import numpy as np
 
 from seq2seq.utils import *
 import os
-import global_utils
+from global_utils import *
+
 import json
 from tensorflow.python.layers import core as layers_core
 
@@ -225,7 +226,7 @@ class Seq2Seq:
 
             if self.load:
                 print('loading')
-                global_utils.check_restore_parameters(sess, saver, self.path + '\model.ckpt')
+                check_restore_parameters(sess, saver, self.path + '\model.ckpt')
             answer = sess.run([self.translations], feed_dict)
 
             print(src_sen)
@@ -247,7 +248,7 @@ class Seq2Seq:
             saver = tf.train.Saver(tf.global_variables())
             if self.load:
                 print('loading Model')
-                global_utils.check_restore_parameters(session, saver, self.path + '\model.ckpt')
+                check_restore_parameters(session, saver, self.path + '\model.ckpt')
 
         with session as sess:
 
@@ -274,84 +275,84 @@ class Seq2Seq:
         return score
 
 
-def train(self, logs_dir):
-    display_each = 200
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        saver = tf.train.Saver(tf.global_variables())
-        if self.load:
-            global_utils.check_restore_parameters(sess, saver, self.path + '\model.ckpt')
+    def train(self, logs_dir):
+        display_each = 200
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+            saver = tf.train.Saver(tf.global_variables())
+            if self.load:
+                check_restore_parameters(sess, saver, self.path + '\model.ckpt')
 
-        num = global_utils.get_trainable_variables_num()
-        print('Number of trainable variables ', num)
-        iter_nums = 120
-        number_of_batches = int(len(data1) / self.batch_size)
-        print('There are ', number_of_batches, ' batches')
-        import time
-        start = self.j['iteration']
+            num = get_trainable_variables_num()
+            print('Number of trainable variables ', num)
+            iter_nums = 120
+            number_of_batches = int(len(data1) / self.batch_size)
+            print('There are ', number_of_batches, ' batches')
+            import time
+            start = self.j['iteration']
 
-        writer = tf.summary.FileWriter(logs_dir)
+            writer = tf.summary.FileWriter(logs_dir)
 
-        writer.add_graph(sess.graph)
-        ## TODO: do Early Stopping
-        for i in range(start, iter_nums):
-            iter_loss = 0
-            iter_time = time.time()
-            for j in range(number_of_batches):
-                enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
-                dec_inp = np.zeros((decoder_length, self.batch_size), dtype='int')
-                dec_tgt = np.zeros((decoder_length, self.batch_size), dtype='int')
-                # dec_tgt = np.zeros((decoder_length - 1, self.batch_size, self.tgt_vocab_size), dtype='int')
+            writer.add_graph(sess.graph)
+            ## TODO: do Early Stopping
+            for i in range(start, iter_nums):
+                iter_loss = 0
+                iter_time = time.time()
+                for j in range(number_of_batches):
+                    enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
+                    dec_inp = np.zeros((decoder_length, self.batch_size), dtype='int')
+                    dec_tgt = np.zeros((decoder_length, self.batch_size), dtype='int')
+                    # dec_tgt = np.zeros((decoder_length - 1, self.batch_size, self.tgt_vocab_size), dtype='int')
 
-                for idx in range(self.batch_size):
-                    # print('input :', data2[j * batch_size + idx])
-                    dec_inp[:, idx] = data2[j * self.batch_size + idx][:-1]
-                    dec_tgt[:, idx] = data2[j * self.batch_size + idx][1:]
-                    enc_inp[:, idx] = data1[j * self.batch_size + idx][1:-1]
-                    # for t in range(decoder_length - 1):
-                    #     dec_tgt[t, idx, :] = get_one_hot(dec_tgt_dummy[t, idx], self.tgt_vocab_size)
+                    for idx in range(self.batch_size):
+                        # print('input :', data2[j * batch_size + idx])
+                        dec_inp[:, idx] = data2[j * self.batch_size + idx][:-1]
+                        dec_tgt[:, idx] = data2[j * self.batch_size + idx][1:]
+                        enc_inp[:, idx] = data1[j * self.batch_size + idx][1:-1]
+                        # for t in range(decoder_length - 1):
+                        #     dec_tgt[t, idx, :] = get_one_hot(dec_tgt_dummy[t, idx], self.tgt_vocab_size)
+                        # print(np.shape(dec_inp))
+                        # print(np.shape(dec_tgt))
+                        # print(np.shape(enc_inp))
+                    feed_dict = {
+                        self.encoder_inputs_placeholder: enc_inp,
+                        self.decoder_inputs_placeholder: dec_inp,
+                        self.decoder_targets_placeholder: np.transpose(dec_tgt),
+                        self.decoder_lengths: np.ones((self.batch_size), dtype=int) * (decoder_length)
+                    }
+                    # print(np.shape(enc_inp))
                     # print(np.shape(dec_inp))
                     # print(np.shape(dec_tgt))
-                    # print(np.shape(enc_inp))
-                feed_dict = {
-                    self.encoder_inputs_placeholder: enc_inp,
-                    self.decoder_inputs_placeholder: dec_inp,
-                    self.decoder_targets_placeholder: np.transpose(dec_tgt),
-                    self.decoder_lengths: np.ones((self.batch_size), dtype=int) * (decoder_length)
-                }
-                # print(np.shape(enc_inp))
-                # print(np.shape(dec_inp))
-                # print(np.shape(dec_tgt))
 
-                _, loss = sess.run([self.train_op, self.loss_op], feed_dict=feed_dict)
-                # print(np.max(labe))
-                iter_loss += np.mean(loss)
-                if j % display_each == 0:
-                    print('Mini batch loss is ', np.mean(loss))
-            print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
-            print("It took ", time.time() - iter_time)
-            tf.summary.scalar('loss', iter_loss)
-            s = sess.run(self.merged_summary, feed_dict={self.iter_loss_placeholder: iter_loss / number_of_batches})
-            print(self.merged_summary)
-            writer.add_summary(s, i)
-            print('Saving model')
-            ## TODO: save i+1 (edit later) ==> done
-            self.j['iteration'] = i + 1
-            with open(self.path + '\config.json', 'w', encoding='utf-8') as f:
-                f.write(json.dumps(self.j))
-                f.flush()
+                    _, loss = sess.run([self.train_op, self.loss_op], feed_dict=feed_dict)
+                    # print(np.max(labe))
+                    iter_loss += np.mean(loss)
+                    if j % display_each == 0:
+                        print('Mini batch loss is ', np.mean(loss))
+                print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
+                print("It took ", time.time() - iter_time)
+                tf.summary.scalar('loss', iter_loss)
+                s = sess.run(self.merged_summary, feed_dict={self.iter_loss_placeholder: iter_loss / number_of_batches})
+                print(self.merged_summary)
+                writer.add_summary(s, i)
+                print('Saving model')
+                ## TODO: save i+1 (edit later) ==> done
+                self.j['iteration'] = i + 1
+                with open(self.path + '\config.json', 'w', encoding='utf-8') as f:
+                    f.write(json.dumps(self.j))
+                    f.flush()
 
-            saver.save(sess, self.path + '\model.ckpt')
+                saver.save(sess, self.path + '\model.ckpt')
 
 
 # model = Seq2Seq(path='saved_seq2seq')
 
 
-model = Seq2Seq(path='Daily_QA_test')
+# model = Seq2Seq(path='Daily_QA_with_Attention')
 # model.train(logs_dir='QA_Board_test')
 
 # input_string = input('Enter Question \n')
 # model.translate(input_string.lower())
 
-score = model.compute_blue(data1_validation, BLEU_score)
-print(score)
+# score = model.compute_blue(data1_validation, BLEU_score)
+# print(score)

@@ -171,8 +171,8 @@ def load_vocab_from_csv(vocab_path):
     cols = df.columns
     dict = {}
     dict_rev = {}
-    for i, token in enumerate(cols):
-        # print(df[token][0] , ' --- ', token)
+    for i, token in enumerate(cols[1:]):
+        print(df[token][0] , ' --- ', token)
         # if(df[token][0] == 15575):
         #     exit()
         dict[df[token][0]] = token
