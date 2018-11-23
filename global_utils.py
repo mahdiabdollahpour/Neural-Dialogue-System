@@ -99,8 +99,8 @@ def create_vocab_file(src, vocab_des, vocab_len, src2=None):
     for (token, i) in most_occure:
         counter += 1
         dict_rev[token] = counter
-    df = pd.DataFrame(dict_rev,index=[0])
-    print("Vocab created, size :",len(dict_rev))
+    df = pd.DataFrame(dict_rev, index=[0])
+    print("Vocab created, size :", len(dict_rev))
     df.to_csv(vocab_des)
 
 
@@ -175,6 +175,7 @@ def load_vocab_from_csv(vocab_path):
         # print(df[token][0] , ' --- ', token)
         # if(df[token][0] == 15575):
         #     exit()
+        # print('token',token)
         dict[df[token][0]] = token
         dict_rev[token] = df[token][0]
     return dict, dict_rev
@@ -192,7 +193,10 @@ def get_sentence_back(sen, vocab):
     sent = ""
     for token in sen:
         # print(token)
-        sent += vocab[token] + " "
+        # print(token)
+        sent += vocab[token + 1] + " "
+        if vocab[token+1]==end_token:
+            return sent
     return sent
 
 

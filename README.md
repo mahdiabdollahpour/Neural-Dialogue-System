@@ -1,4 +1,4 @@
-"# RNN-Language-Model" 
+"# RNN-Language-Model + SEQ2SEQ model for question answering" 
 
 ##### Two main approaches
 
@@ -9,7 +9,9 @@
 using  LSTM layers to model recurrent neural network to predict next word or char
 given the previous ones
 
+#### How To  Use This Code
 
+(will be added soon)
 
 #### TO DO
 

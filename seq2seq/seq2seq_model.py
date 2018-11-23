@@ -64,7 +64,10 @@ global decoder_targets_placeholder
 global load
 global merged_summary
 
-model_file_name =  '\model.ckpt'
+model_file_name = '\model.ckpt'
+config_file = '\config.json'
+
+
 def define_graph(address='saved_model', QA=True):
     global train_op
     global loss_op
@@ -80,10 +83,10 @@ def define_graph(address='saved_model', QA=True):
 
     path = address
     if not os.path.exists(path):
-        print('Model is being created')
         os.makedirs(path)
+        print('Model is being created at :', path + config_file)
         conf = {}
-        with open(path + '\config.json', 'w', encoding='utf-8') as f:
+        with open(path + config_file, 'w', encoding='utf-8') as f:
             # global json_loaded_data
 
             conf['iteration'] = 0
@@ -97,7 +100,7 @@ def define_graph(address='saved_model', QA=True):
             json_loaded_data = json.loads(json_string)
         load = False
     else:
-        with open(path + '\config.json', 'r') as f:
+        with open(path + config_file, 'r') as f:
             # global json_loaded_data
 
             stri = f.read()
@@ -105,7 +108,6 @@ def define_graph(address='saved_model', QA=True):
             json_loaded_data = json.loads(stri)
         # load = False
         load = True
-
 
     src_vocab_size = len(dict_rev)
     tgt_vocab_size = len(dict_rev)
@@ -205,7 +207,6 @@ def define_graph(address='saved_model', QA=True):
         inference_decoder, maximum_iterations=maximum_iterations)
 
     translations = outputs.sample_id
-
 
 
 def translate(src_sen):
@@ -340,15 +341,17 @@ def train(logs_dir):
             print('Saving model')
             ## TODO: save i+1 (edit later) ==> done
             json_loaded_data['iteration'] = i + 1
-            with open(path + '\config.json', 'w', encoding='utf-8') as f:
+            with open(path + config_file, 'w', encoding='utf-8') as f:
                 f.write(json.dumps(json_loaded_data))
                 f.flush()
 
             saver.save(sess, path + model_file_name)
 
 
-define_graph('new_model',True)
+define_graph('waznha', True)
 # train('new_logs')
-# translate('How are you doing ? ')
+inputt = input('Enter question')
+while inputt != 'q':
+    translate(inputt)
+    inputt = input('Enter question')
 # compute_blue(data1_validation,BLEU_score)
-
