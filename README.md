@@ -9,9 +9,17 @@
 using  LSTM layers to model recurrent neural network to predict next word or char
 given the previous ones
 
-#### How To  Use This Code
+### How To  Use This Code
 
-(will be added soon)
+#### Creating QA Model
+(will be completed soon)
+
+#### Using Pretrained Model on Daily Dialog Dataset
+(will be completed soon)
+
+#### Your Dataset Format 
+(will be completed soon)
+
 
 #### TO DO
 
