@@ -33,7 +33,7 @@ given the previous ones
 
 - [X] Converting string data to indexes takes long not to do it every time
 
-- [ ] Code is dirty I've got to clean it
+- [X] Code is dirty I've got to clean it
 
 - [x] Saving is not handled in seq2seq
 

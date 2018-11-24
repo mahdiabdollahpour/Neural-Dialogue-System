@@ -10,7 +10,7 @@ from parametrs import *
 global data1, data2, vocab, dict_rev, data1_validation, data2_validation, test1, test2
 
 
-def load_data(length):
+def load_data(length=None):
     print('Loading Data...')
     global data1, data2, vocab, dict_rev, data1_validation, data2_validation, test1, test2
 
@@ -109,7 +109,7 @@ def define_graph(address='saved_model', QA=True):
     encoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, encoder_inputs_placeholder)
 
     encoder_cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(hidden_num)
-                                               for i in range(layer_num)])
+                                                for i in range(layer_num)])
 
     encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(
         encoder_cell, encoder_inputs_embedded,
@@ -124,7 +124,7 @@ def define_graph(address='saved_model', QA=True):
         memory_sequence_length=None)
 
     decoder_cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(hidden_num)
-                                               for i in range(layer_num)])
+                                                for i in range(layer_num)])
     decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
         decoder_cell, attention_mechanism,
         attention_layer_size=hidden_num)
@@ -257,7 +257,10 @@ def compute_blue(questions, score_func, session=None):
     return score
 
 
-def train(logs_dir):
+def train(logs_dir, use_tensorBoard=False):
+    global loss_op
+    global train_op
+    global iter_loss_placeholder
     display_each = 200
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -268,17 +271,16 @@ def train(logs_dir):
 
         num = get_trainable_variables_num()
         print('Number of trainable variables ', num)
-        iter_nums = 120
         number_of_batches = int(len(data1) / batch_size)
         print('There are ', number_of_batches, ' batches')
         global json_loaded_data
         start = json_loaded_data['iteration']
+        if use_tensorBoard:
+            writer = tf.summary.FileWriter(logs_dir)
+            writer.add_graph(sess.graph)
 
-        writer = tf.summary.FileWriter(logs_dir)
-
-        writer.add_graph(sess.graph)
         ## TODO: do Early Stopping
-        for i in range(start, iter_nums):
+        for i in range(start, epoch_num):
             iter_loss = 0
             iter_time = time.time()
             for j in range(number_of_batches):
@@ -300,29 +302,34 @@ def train(logs_dir):
                     decoder_lengths: np.ones((batch_size), dtype=int) * (decoder_length)
                 }
 
-                global loss_op
-                global train_op
-                global iter_loss_placeholder
                 _, loss = sess.run([train_op, loss_op], feed_dict=feed_dict)
                 # print(np.max(labe))
                 iter_loss += np.mean(loss)
                 if j % display_each == 0:
                     print('Mini batch loss is ', np.mean(loss))
-            print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
+            average_loss = iter_loss / number_of_batches
+            print('Average loss in iteration ', i, ' is ', average_loss)
             print("It took ", time.time() - iter_time)
-            # tf.summary.scalar('loss', iter_loss)
-            iter_loss_placeholder = tf.placeholder(tf.float32, name='iter_loss')
-            tf.summary.scalar("loss", iter_loss_placeholder)
-            merged_summary = tf.summary.merge_all()
+            print('Saving model...')
+            if use_tensorBoard:
+                tf.summary.scalar('loss', iter_loss)
+                iter_loss_placeholder = tf.placeholder(tf.float32, name='iter_loss')
+                tf.summary.scalar("loss", iter_loss_placeholder)
+                merged_summary = tf.summary.merge_all()
 
-            s = sess.run(merged_summary, feed_dict={iter_loss_placeholder: iter_loss / number_of_batches})
-            print(merged_summary)
-            writer.add_summary(s, i)
-            print('Saving model')
-            ## TODO: save i+1 (edit later) ==> done
+                s = sess.run(merged_summary, feed_dict={iter_loss_placeholder: iter_loss / number_of_batches})
+                print(merged_summary)
+                writer.add_summary(s, i)
+            else:
+                # print(logs_dir + log_file_name)
+                with open(logs_dir + ".txt", 'a', encoding='utf-8') as f:
+                    f.write(str(average_loss) + ',' + str(i) + '\n')
+                    f.flush()
+
             json_loaded_data['iteration'] = i + 1
             with open(path + config_file, 'w', encoding='utf-8') as f:
                 f.write(json.dumps(json_loaded_data))
                 f.flush()
 
             saver.save(sess, path + model_file_name)
+            print('Model saved')

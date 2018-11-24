@@ -6,6 +6,7 @@ batch_size = 64
 layer_num = 2
 embed_size = 100
 lr = 0.001
+epoch_num = 120
 
 dataset_path = 'datasets/DailyDialog'
 all_questions = dataset_path + '/Q_all.txt'
@@ -23,11 +24,11 @@ test_questions_csv = dataset_path + '/test/Q_test.csv'
 test_answers_csv = dataset_path + '/test/A_test.csv'
 test_answers = dataset_path + '/test/A_test.txt'
 
-
 vocab_path = dataset_path + '/vocab.csv'
 
 model_file_name = '\model.ckpt'
 config_file = '\config.json'
+# log_file_name = '\logs.txt'
 
 unknown_token = '<unk>'
 empty_token = '<EMP>'
