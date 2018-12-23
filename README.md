@@ -1,4 +1,4 @@
-"# RNN-Language-Model" 
+"# RNN-Language-Model + SEQ2SEQ model for question answering" 
 
 ##### Two main approaches
 
@@ -9,21 +9,39 @@
 using  LSTM layers to model recurrent neural network to predict next word or char
 given the previous ones
 
+### How To  Use This Code
+
+#### Creating QA Model
+(will be completed soon)
+
+#### Using Pretrained Model on Daily Dialog Dataset
+(will be completed soon)
+
+#### Your Dataset Format 
+(will be completed soon)
 
 
 #### TO DO
 
 - [ ] Using state_is_tuple in char level
 
-- [x] printing number of trainable parameter
+- [x] Printing number of trainable parameter
 
-- [ ] running word level with new changes
+- [ ] Training the model
 
-- [ ] using estimator
+- [ ] Using Estimator
 
-- [ ] converting string data to indexes takes long
+- [X] Converting string data to indexes takes long not to do it every time
 
-- [ ] code is dirty I've got to clean it
+- [X] Code is dirty I've got to clean it
 
-- [x] saving is not handled in seq2seq
+- [x] Saving is not handled in seq2seq
+
+- [x] Plotting loss
+
+- [x] Adding Dropout
+
+- [ ] Last batches are ignored , not getting to batch_size
+
+- [ ] Handle early stopping
 
