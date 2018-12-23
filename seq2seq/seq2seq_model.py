@@ -5,15 +5,19 @@ from seq2seq.utils import *
 import os
 import global_utils
 
-how_many_lines = 50
+how_many_lines = 7441
+# how_many_lines = 50
 data1string, dict1, dict_rev1 = load_data_and_create_vocab('../datasets/it-en/en.txt', how_many_lines)
 data2string, dict2, dict_rev2 = load_data_and_create_vocab('../datasets/it-en/it.txt', how_many_lines)
 print('Data is read and vocab is created')
 source_sequence_length = 23
 decoder_lengths = 26
+print('vocab len', len(dict1))
+print('vocab len target', len(dict2))
 data1 = data_by_ID_and_truncated(data1string, dict_rev1, source_sequence_length)
 data2 = data_by_ID_and_truncated(data2string, dict_rev2, decoder_lengths + 1,
                                  append_and_prepend=True)
+print('sequences are made by indexes ')
 
 
 class Seq2Seq:
@@ -120,6 +124,7 @@ class Seq2Seq:
             saver = tf.train.Saver(tf.global_variables())
 
             if self.load:
+                print('loading')
                 global_utils.check_restore_parameters(sess, saver, self.path + '\model.ckpt')
             thought_vector = sess.run([self.encoder_final_state], feed_dict)
             # thought_vector = thought_vector[-1]
@@ -156,9 +161,10 @@ class Seq2Seq:
             iter_num = 200
             number_of_batches = int(len(data1) / self.batch_size)
             print('There are ', number_of_batches, ' batches')
+            import time
             for i in range(iter_num):
                 iter_loss = 0
-
+                iter_time = time.time()
                 for j in range(number_of_batches):
                     enc_inp = np.zeros((source_sequence_length, self.batch_size), dtype='int')
                     dec_inp = np.zeros((decoder_lengths + 1, self.batch_size), dtype='int')
@@ -188,10 +194,11 @@ class Seq2Seq:
                     if j % display_each == 0:
                         print('Mini batch loss is ', loss)
                 print('Average loss in iteration ', i, ' is ', iter_loss / number_of_batches)
+                print("It took ", time.time() - iter_time)
                 print('Saving model')
                 saver.save(sess, self.path + '\model.ckpt')
 
 
 model = Seq2Seq()
-# model.train()
-model.translate("Resumption of the session")
+model.train()
+# model.translate("good morning")

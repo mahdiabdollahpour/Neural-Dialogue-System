@@ -109,4 +109,6 @@ test*.
 board/
 glove.6B/
 saved/
+char_level/saved
 datasets/it-en
+.DS_Store
