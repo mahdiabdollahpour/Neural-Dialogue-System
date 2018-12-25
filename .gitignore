@@ -9,6 +9,9 @@ __pycache__/
 *.index
 *.meta
 *.json
+datasets/
+Board_logs/
+Saved_models/
 
 # Distribution / packaging
 .Python
