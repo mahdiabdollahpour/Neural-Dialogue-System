@@ -1,7 +1,10 @@
+
 from gensim.models import LdaModel
+from gensim.models import LdaMulticore
 from gensim.test.utils import common_texts
 from gensim.corpora.dictionary import Dictionary
 import numpy as np
+import os
 
 
 def cluster_questions(topic_num, res_path, q_path='datasets\DialogQA\Qall.txt', a_path='datasets\DialogQA\Aall.txt'):
@@ -13,10 +16,12 @@ def cluster_questions(topic_num, res_path, q_path='datasets\DialogQA\Qall.txt', 
 
     common_dictionary = Dictionary(common_texts)
     common_corpus = [common_dictionary.doc2bow(text) for text in common_texts]
+
     lda = LdaModel(common_corpus, num_topics=topic_num)
 
+
     questions_clusterd = [[] for i in range(topic_num)]
-    print('Questions : ',len(questions))
+    print('Questions : ', len(questions))
     perp = lda.log_perplexity(common_corpus)
     for i, q in enumerate(questions):
         other_corpus = [common_dictionary.doc2bow(common_texts[i])]
@@ -30,6 +35,8 @@ def cluster_questions(topic_num, res_path, q_path='datasets\DialogQA\Qall.txt', 
                 max_prob = prob
         questions_clusterd[topic].append(q)
         # print(topic)
+    if (not os._exists(res_path)):
+        os.makedirs(res_path)
     for top in range(topic_num):
         with open(res_path + str(top) + '.txt', 'w', encoding='utf-8') as f:
             for quest in questions_clusterd[top]:

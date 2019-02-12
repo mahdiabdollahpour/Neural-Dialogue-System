@@ -10,23 +10,23 @@ from parametrs import *
 global data1, data2, vocab, dict_rev, data1_validation, data2_validation, test1, test2
 
 
-def load_data(length=None):
+def load_data(parameterClass, length=None):
     print('Loading Data...')
     global data1, data2, vocab, dict_rev, data1_validation, data2_validation, test1, test2
 
     # dataset_path = '../datasets/DailyDialog'
-    vocab, dict_rev = load_vocab_from_csv(vocab_path)
+    vocab, dict_rev = load_vocab_from_csv(parameterClass.vocab_path)
     if length is not None:
-        data1 = load_data_from_csv(train_questions_csv)[:length]
-        data2 = load_data_from_csv(train_answers_csv)[:length]
+        data1 = load_data_from_csv(parameterClass.train_questions_csv)[:length]
+        data2 = load_data_from_csv(parameterClass.train_answers_csv)[:length]
     else:
-        data1 = load_data_from_csv(train_questions_csv)
-        data2 = load_data_from_csv(train_answers_csv)
+        data1 = load_data_from_csv(parameterClass.train_questions_csv)
+        data2 = load_data_from_csv(parameterClass.train_answers_csv)
 
-    data1_validation = load_data_from_csv(validation_questions_csv)
-    data2_validation = load_data_from_csv(validation_answers_csv)
-    data1_test = load_data_from_csv(test_questions_csv)
-    data2_test = load_data_from_csv(test_answers_csv)
+    # data1_validation = load_data_from_csv(validation_questions_csv)
+    # data2_validation = load_data_from_csv(validation_answers_csv)
+    # data1_test = load_data_from_csv(test_questions_csv)
+    # data2_test = load_data_from_csv(test_answers_csv)
 
     print('Data is Loaded')
     print('Vocab Length is', len(dict_rev))
@@ -47,7 +47,7 @@ global load
 global merged_summary
 
 
-def define_graph(address='saved_model', QA=True):
+def define_graph(parameterClass, address='saved_model', QA=True):
     global train_op
     global loss_op
     global encoder_inputs_placeholder
@@ -63,13 +63,13 @@ def define_graph(address='saved_model', QA=True):
     path = address
     if not os.path.exists(path):
         os.makedirs(path)
-        print('Model is being created at :', path + config_file)
+        print('Model is being created at :', path + parameterClass.config_file)
         conf = {}
-        with open(path + config_file, 'w', encoding='utf-8') as f:
+        with open(path + parameterClass.config_file, 'w', encoding='utf-8') as f:
             # global json_loaded_data
             conf['iteration'] = 0
-            conf['embedding_size'] = embed_size
-            conf['hidden_num'] = hidden_size
+            conf['embedding_size'] = parameterClass.embed_size
+            conf['hidden_num'] = parameterClass.hidden_size
             print(conf)
             json_string = json.dumps(conf)
             print(json_string)
@@ -78,7 +78,7 @@ def define_graph(address='saved_model', QA=True):
             json_loaded_data = json.loads(json_string)
         load = False
     else:
-        with open(path + config_file, 'r') as f:
+        with open(path + parameterClass.config_file, 'r') as f:
             # global json_loaded_data
 
             stri = f.read()
@@ -124,12 +124,12 @@ def define_graph(address='saved_model', QA=True):
         memory_sequence_length=None)
 
     decoder_cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(hidden_num)
-                                                for i in range(layer_num)])
+                                                for i in range(parameterClass.layer_num)])
     decoder_cell = tf.contrib.seq2seq.AttentionWrapper(
         decoder_cell, attention_mechanism,
         attention_layer_size=hidden_num)
 
-    decoder_lengths = tf.placeholder(tf.int32, shape=batch_size, name="decoder_length")
+    decoder_lengths = tf.placeholder(tf.int32, shape=parameterClass.batch_size, name="decoder_length")
     print('decoder length ', decoder_lengths)
     # batch_size = tf.shape( decoder_lengths)[0]
 
@@ -138,7 +138,7 @@ def define_graph(address='saved_model', QA=True):
     projection_layer = layers_core.Dense(
         tgt_vocab_size, use_bias=False)
 
-    initial_state = decoder_cell.zero_state(batch_size, tf.float32).clone(cell_state=encoder_final_state)
+    initial_state = decoder_cell.zero_state(parameterClass.batch_size, tf.float32).clone(cell_state=encoder_final_state)
 
     decoder = tf.contrib.seq2seq.BasicDecoder(
         decoder_cell, helper, initial_state,
@@ -146,7 +146,8 @@ def define_graph(address='saved_model', QA=True):
 
     final_outputs, _final_state, _final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder)
     logits = final_outputs.rnn_output
-    decoder_targets_placeholder = tf.placeholder(dtype="int32", shape=(batch_size, decoder_length))
+    decoder_targets_placeholder = tf.placeholder(dtype="int32",
+                                                 shape=(parameterClass.batch_size, parameterClass.decoder_length))
 
     # Loss
     loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -169,7 +170,7 @@ def define_graph(address='saved_model', QA=True):
 
     # Inference
     inference_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(embeddings2,
-                                                                tf.fill([batch_size],
+                                                                tf.fill([parameterClass.batch_size],
                                                                         int(dict_rev[start_token])),
                                                                 dict_rev[end_token])
 
@@ -180,7 +181,7 @@ def define_graph(address='saved_model', QA=True):
 
     # We should specify maximum_iterations, it can't stop otherwise.
     # source_sequence_length = encoder_length
-    maximum_iterations = tf.round(tf.reduce_max(source_sequence_length) * 2)
+    maximum_iterations = tf.round(tf.reduce_max(parameterClass.source_sequence_length) * 2)
 
     # Dynamic decoding
     outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(
@@ -189,20 +190,20 @@ def define_graph(address='saved_model', QA=True):
     translations = outputs.sample_id
 
 
-def translate(src_sen):
-    src_sen_ = pad_sentence(src_sen.lower(), source_sequence_length)
+def translate(src_sen, parameterClass):
+    src_sen_ = pad_sentence(src_sen.lower(), parameterClass.source_sequence_length)
 
     by_index = sentence_by_id(src_sen_, dict_rev)
     sequence = np.asarray(by_index)
     print('seq ', sequence)
 
-    inference_encoder_inputs = np.empty((source_sequence_length, batch_size))
-    for i in range(0, batch_size):
+    inference_encoder_inputs = np.empty((parameterClass.source_sequence_length, parameterClass.batch_size))
+    for i in range(0, parameterClass.batch_size):
         inference_encoder_inputs[:, i] = sequence
 
     feed_dict = {
         encoder_inputs_placeholder: inference_encoder_inputs,
-        decoder_lengths: np.ones(batch_size, dtype=int) * decoder_length
+        decoder_lengths: np.ones(parameterClass.batch_size, dtype=int) * parameterClass.decoder_length
 
     }
     with tf.Session() as sess:
@@ -211,53 +212,53 @@ def translate(src_sen):
 
         if load:
             print('loading')
-            check_restore_parameters(sess, saver, path + model_file_name)
+            check_restore_parameters(sess, saver, path + parameterClass.model_file_name)
         answer = sess.run([translations], feed_dict)
 
         print(src_sen)
-        answer = np.reshape(answer, [-1, batch_size])
+        answer = np.reshape(answer, [-1, parameterClass.batch_size])
         print(get_sentence_back(answer[0], vocab))
 
 
-def compute_blue(questions, score_func, session=None):
-    with open(validation_answers, encoding='utf-8') as f:
+def compute_blue(questions, score_func, parameterClass, session=None):
+    with open(parameterClass.validation_answers, encoding='utf-8') as f:
         A_lines = f.readlines()
 
     answers_given = []
-    number_of_batches = int(len(A_lines) / batch_size)
+    number_of_batches = int(len(A_lines) / parameterClass.batch_size)
     if session is None:
         session = tf.Session()
         session.run(tf.global_variables_initializer())
         saver = tf.train.Saver(tf.global_variables())
         if load:
             print('loading Model')
-            check_restore_parameters(session, saver, path + model_file_name)
+            check_restore_parameters(session, saver, path + parameterClass.model_file_name)
 
     with session as sess:
 
         for j in range(0, number_of_batches):
-            enc_inp = np.zeros((source_sequence_length, batch_size), dtype='int')
+            enc_inp = np.zeros((parameterClass.source_sequence_length, parameterClass.batch_size), dtype='int')
 
-            for idx in range(batch_size):
-                enc_inp[:, idx] = questions[j * batch_size + idx][1:-1]
+            for idx in range(parameterClass.batch_size):
+                enc_inp[:, idx] = questions[j * parameterClass.batch_size + idx][1:-1]
 
             feed_dict = {
                 encoder_inputs_placeholder: enc_inp,
-                decoder_lengths: np.ones((batch_size), dtype=int) * (decoder_length)
+                decoder_lengths: np.ones((batch_size), dtype=int) * (parameterClass.decoder_length)
             }
             trans = sess.run([translations], feed_dict=feed_dict)
             # print('trans_shape :', np.shape(trans))
-            trans = np.reshape(trans, [-1, batch_size])
+            trans = np.reshape(trans, [-1, parameterClass.batch_size])
             for sen in trans:
                 # print('sen', sen)
                 answers_given.append(get_sentence_back(sen, vocab))
 
-    score = score_func(A_lines[:number_of_batches * batch_size], answers_given)
+    score = score_func(A_lines[:number_of_batches * parameterClass.batch_size], answers_given)
 
     return score
 
 
-def train(logs_dir, use_tensorBoard=False):
+def train(logs_dir, parameterClass, use_tensorBoard=False):
     global loss_op
     global train_op
     global iter_loss_placeholder
@@ -267,11 +268,11 @@ def train(logs_dir, use_tensorBoard=False):
         saver = tf.train.Saver(tf.global_variables())
         global path
         if load:
-            check_restore_parameters(sess, saver, path + model_file_name)
+            check_restore_parameters(sess, saver, path + parameterClass.model_file_name)
 
         num = get_trainable_variables_num()
         print('Number of trainable variables ', num)
-        number_of_batches = int(len(data1) / batch_size)
+        number_of_batches = int(len(data1) / parameterClass.batch_size)
         print('There are ', number_of_batches, ' batches')
         global json_loaded_data
         start = json_loaded_data['iteration']
@@ -284,22 +285,22 @@ def train(logs_dir, use_tensorBoard=False):
             iter_loss = 0
             iter_time = time.time()
             for j in range(number_of_batches):
-                enc_inp = np.zeros((source_sequence_length, batch_size), dtype='int')
-                dec_inp = np.zeros((decoder_length, batch_size), dtype='int')
-                dec_tgt = np.zeros((decoder_length, batch_size), dtype='int')
+                enc_inp = np.zeros((parameterClass.source_sequence_length, parameterClass.batch_size), dtype='int')
+                dec_inp = np.zeros((parameterClass.decoder_length, parameterClass.batch_size), dtype='int')
+                dec_tgt = np.zeros((parameterClass.decoder_length, parameterClass.batch_size), dtype='int')
                 # dec_tgt = np.zeros((decoder_length - 1,  batch_size,  tgt_vocab_size), dtype='int')
 
-                for idx in range(batch_size):
+                for idx in range(parameterClass.batch_size):
                     # print('input :', data2[j * batch_size + idx])
-                    dec_inp[:, idx] = data2[j * batch_size + idx][:-1]
-                    dec_tgt[:, idx] = data2[j * batch_size + idx][1:]
-                    enc_inp[:, idx] = data1[j * batch_size + idx][1:-1]
+                    dec_inp[:, idx] = data2[j * parameterClass.batch_size + idx][:-1]
+                    dec_tgt[:, idx] = data2[j * parameterClass.batch_size + idx][1:]
+                    enc_inp[:, idx] = data1[j * parameterClass.batch_size + idx][1:-1]
 
                 feed_dict = {
                     encoder_inputs_placeholder: enc_inp,
                     decoder_inputs_placeholder: dec_inp,
                     decoder_targets_placeholder: np.transpose(dec_tgt),
-                    decoder_lengths: np.ones((batch_size), dtype=int) * (decoder_length)
+                    decoder_lengths: np.ones((parameterClass.batch_size), dtype=int) * (parameterClass.decoder_length)
                 }
 
                 _, loss = sess.run([train_op, loss_op], feed_dict=feed_dict)
@@ -327,9 +328,9 @@ def train(logs_dir, use_tensorBoard=False):
                     f.flush()
 
             json_loaded_data['iteration'] = i + 1
-            with open(path + config_file, 'w', encoding='utf-8') as f:
+            with open(path + parameterClass.config_file, 'w', encoding='utf-8') as f:
                 f.write(json.dumps(json_loaded_data))
                 f.flush()
 
-            saver.save(sess, path + model_file_name)
+            saver.save(sess, path + parameterClass.model_file_name)
             print('Model saved')

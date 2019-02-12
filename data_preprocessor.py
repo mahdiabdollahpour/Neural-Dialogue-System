@@ -1,6 +1,6 @@
 from global_utils import *
 
-from parametrs import *
+from parametrs import DialogQAParams as dqap, DialyDialogParams as ddp
 
 
 def load_DailyDialog(src, Q_des, A_des):
@@ -171,41 +171,72 @@ def create_data_file(src, dict_rev, data_des, trunc_length):
 
 
 def preprocess_DailyDialog():
-
     print('preprocessing Data...')
-    load_DailyDialog(dataset_path + '/test/dialogues_test.txt', test_questions, test_answers)
-    load_DailyDialog(dataset_path + '/train/dialogues_train.txt', train_questions, train_answers)
-    load_DailyDialog(dataset_path + '/validation/dialogues_validation.txt', validation_questions, validation_answers)
+    load_DailyDialog(ddp.dataset_path + '/test/dialogues_test.txt', ddp.test_questions, ddp.test_answers)
+    load_DailyDialog(ddp.dataset_path + '/train/dialogues_train.txt', ddp.train_questions, ddp.train_answers)
+    load_DailyDialog(ddp.dataset_path + '/validation/dialogues_validation.txt', ddp.validation_questions,
+                     ddp.validation_answers)
+
+
+def Diaalog_QA():
+    print('preprocessing Data...')
+    create_vocab_file(dqap.all_questions, dqap.vocab_path, 1000000)
+    vocab, dict_rev = load_vocab_from_csv(dqap.vocab_path)
+    # print()
+    create_data_file(dqap.all_questions, dict_rev, dqap.all_questions_csv, dqap.source_sequence_length)
+    create_data_file(dqap.all_answers, dict_rev, dqap.all_answers_csv, dqap.decoder_length)
+
 
 def preprocess():
     print('preprocessing Data...')
 
-    create_vocab_file(src=all_questions, vocab_des=vocab_path, max_vocab_len=20000, src2=all_answers)
-    vocab, dict_rev = load_vocab_from_csv(vocab_path)
+    create_vocab_file(src=ddp.all_questions, vocab_des=ddp.vocab_path, max_vocab_len=20000, src2=ddp.all_answers)
+    vocab, dict_rev = load_vocab_from_csv(ddp.vocab_path)
     ## validation
-    create_data_file(src=validation_questions,
-                     dict_rev=dict_rev, data_des=validation_questions_csv,
-                     trunc_length=source_sequence_length + 2)
+    create_data_file(src=ddp.validation_questions,
+                     dict_rev=dict_rev, data_des=ddp.validation_questions_csv,
+                     trunc_length=ddp.source_sequence_length + 2)
 
-    create_data_file(src=validation_answers,
-                     dict_rev=dict_rev, data_des=validation_answers_csv,
-                     trunc_length=decoder_length + 1)
+    create_data_file(src=ddp.validation_answers,
+                     dict_rev=dict_rev, data_des=ddp.validation_answers_csv,
+                     trunc_length=ddp.decoder_length + 1)
 
     ## test
-    create_data_file(src=test_questions,
-                     dict_rev=dict_rev, data_des=test_questions_csv,
-                     trunc_length=source_sequence_length + 2)
+    create_data_file(src=ddp.test_questions,
+                     dict_rev=dict_rev, data_des=ddp.test_questions_csv,
+                     trunc_length=ddp.source_sequence_length + 2)
 
-    create_data_file(src=test_answers,
-                     dict_rev=dict_rev, data_des=test_answers_csv,
-                     trunc_length=decoder_length + 1)
+    create_data_file(src=ddp.test_answers,
+                     dict_rev=dict_rev, data_des=ddp.test_answers_csv,
+                     trunc_length=ddp.decoder_length + 1)
     ##train
-    create_data_file(src=train_questions,
-                     dict_rev=dict_rev, data_des=train_questions_csv,
-                     trunc_length=source_sequence_length + 2)
+    create_data_file(src=ddp.train_questions,
+                     dict_rev=dict_rev, data_des=ddp.train_questions_csv,
+                     trunc_length=ddp.source_sequence_length + 2)
 
-    create_data_file(src=train_answers,
-                     dict_rev=dict_rev, data_des=train_answers_csv,
-                     trunc_length=decoder_length + 1)
+    create_data_file(src=ddp.train_answers,
+                     dict_rev=dict_rev, data_des=ddp.train_answers_csv,
+                     trunc_length=ddp.decoder_length + 1)
 
 
+def generate_data_from_clusters(cluster_add, src_add, dest_add):
+    src = []
+    dest = []
+
+    for f in os.listdir(cluster_add):
+        print(f)
+        with open(cluster_add + '/' + f, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        for i in range(len(lines)):
+            if (lines[i] not in src):
+                for j in range(i, len(lines)):
+                    src.append(lines[i])
+                    dest.append(lines[j])
+    print("Writing Files...")
+
+    with open(src_add, 'w', encoding='utf-8') as f:
+        for line in src:
+            f.write(line)
+    with open(dest_add, 'w', encoding='utf-8') as f:
+        for line in dest:
+            f.write(line)
