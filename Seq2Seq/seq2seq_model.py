@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-
+import logging
 from global_utils import *
 import time
 import json
@@ -11,24 +11,27 @@ global data1, data2, vocab, dict_rev, data1_validation, data2_validation, test1,
 
 
 def load_data(parameterClass, length=None):
+    # print('Loading Data...')
     print('Loading Data...')
     global data1, data2, vocab, dict_rev, data1_validation, data2_validation, test1, test2
 
     # dataset_path = '../datasets/DailyDialog'
+    t = time.time()
     vocab, dict_rev = load_vocab_from_csv(parameterClass.vocab_path)
-    if length is not None:
-        data1 = load_data_from_csv(parameterClass.train_questions_csv)[:length]
-        data2 = load_data_from_csv(parameterClass.train_answers_csv)[:length]
-    else:
-        data1 = load_data_from_csv(parameterClass.train_questions_csv)
-        data2 = load_data_from_csv(parameterClass.train_answers_csv)
+    print('Vocab loaded')
+    # if length is not None:
+    data1 = load_data_from_csv(parameterClass.train_questions_csv, length)
+    data2 = load_data_from_csv(parameterClass.train_answers_csv, length)
+    # else:
+    #     data1 = load_data_from_csv(parameterClass.train_questions_csv)
+    #     data2 = load_data_from_csv(parameterClass.train_answers_csv)
 
     # data1_validation = load_data_from_csv(validation_questions_csv)
     # data2_validation = load_data_from_csv(validation_answers_csv)
     # data1_test = load_data_from_csv(test_questions_csv)
     # data2_test = load_data_from_csv(test_answers_csv)
 
-    print('Data is Loaded')
+    print('Data is Loaded in', time.time() - t)
     print('Vocab Length is', len(dict_rev))
     print('Number of Training Examples', len(data1))
     print('Number of Training Examples', len(data2))
@@ -109,7 +112,7 @@ def define_graph(parameterClass, address='saved_model', QA=True):
     encoder_inputs_embedded = tf.nn.embedding_lookup(embeddings1, encoder_inputs_placeholder)
 
     encoder_cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(hidden_num)
-                                                for i in range(layer_num)])
+                                                for i in range(parameterClass.layer_num)])
 
     encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(
         encoder_cell, encoder_inputs_embedded,

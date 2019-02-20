@@ -1,6 +1,7 @@
 from global_utils import *
 
 from parametrs import DialogQAParams as dqap, DialyDialogParams as ddp
+import random
 
 
 def load_DailyDialog(src, Q_des, A_des):
@@ -178,13 +179,13 @@ def preprocess_DailyDialog():
                      ddp.validation_answers)
 
 
-def Diaalog_QA():
+def create_Diaalog_QA_data():
     print('preprocessing Data...')
-    create_vocab_file(dqap.all_questions, dqap.vocab_path, 1000000)
+    create_vocab_file(dqap.train_questions, dqap.vocab_path, 15000)
     vocab, dict_rev = load_vocab_from_csv(dqap.vocab_path)
     # print()
-    create_data_file(dqap.all_questions, dict_rev, dqap.all_questions_csv, dqap.source_sequence_length)
-    create_data_file(dqap.all_answers, dict_rev, dqap.all_answers_csv, dqap.decoder_length)
+    create_data_file(dqap.train_questions, dict_rev, dqap.train_questions_csv, dqap.source_sequence_length + 2)
+    create_data_file(dqap.train_answers, dict_rev, dqap.train_answers_csv, dqap.decoder_length + 1)
 
 
 def preprocess():
@@ -232,6 +233,11 @@ def generate_data_from_clusters(cluster_add, src_add, dest_add):
                 for j in range(i, len(lines)):
                     src.append(lines[i])
                     dest.append(lines[j])
+
+    c = list(zip(src, dest))
+    random.shuffle(c)
+    src, dest = zip(*c)
+
     print("Writing Files...")
 
     with open(src_add, 'w', encoding='utf-8') as f:

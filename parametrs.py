@@ -35,13 +35,13 @@ class DialogQAParams():
     layer_num = 2
     batch_size = 128
     hidden_size = 512
-    source_sequence_length = 70
-    decoder_length = 70
+    source_sequence_length = 68
+    decoder_length = 69
     dataset_path = 'datasets/DialogQA/pairs'
-    all_questions = dataset_path + '/src.txt'
-    all_answers = dataset_path + '/dest.txt'
-    all_questions_csv = dataset_path + '/src.csv'
-    all_answers_csv = dataset_path + '/dest.csv'
+    train_questions = dataset_path + '/src.txt'
+    train_answers = dataset_path + '/dest.txt'
+    train_questions_csv = dataset_path + '/src.csv'
+    train_answers_csv = dataset_path + '/dest.csv'
 
     vocab_path = dataset_path + '/vocab.csv'
 
